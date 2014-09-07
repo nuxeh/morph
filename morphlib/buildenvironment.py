@@ -121,6 +121,9 @@ class BuildEnvironment():
         elif arch.startswith('armv7'):
             cpu = arch
             abi = 'eabi'
+        elif arch.startswith('armv6'):
+            cpu = arch
+            abi = 'eabi'
         elif arch == 'armv8l64':  # pragma: no cover
             cpu = 'aarch64'
             abi = ''

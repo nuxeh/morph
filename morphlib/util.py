@@ -473,6 +473,7 @@ def get_host_architecture(): # pragma: no cover
         'i586': 'x86_32',
         'i686': 'x86_32',
         'armv5l': 'armv5l',
+        'armv6l': 'armv6l',
         'armv7l': 'armv7l',
         'armv7b': 'armv7b',
         'armv8l': 'armv8l',
@@ -489,6 +490,8 @@ def get_host_architecture(): # pragma: no cover
 
     if machine == 'armv7l' and has_hardware_fp():
         return 'armv7lhf'
+    elif machine == 'armv6l' and has_hardware_fp():
+        return 'armv6lhf'
     elif machine in ('mips', 'mips64'):
         if determine_endianness() == 'big':
             return table[machine]+'b'
@@ -538,13 +541,13 @@ def get_data(relative_path): # pragma: no cover
 
 def unshared_cmdline(args, root='/', mounts=()): # pragma: no cover
     '''Describe how to run 'args' inside a separate mount namespace.
-    
+
     This function wraps 'args' in a rather long commandline that ensures
     the subprocess cannot see any of the system's mounts other than those
     listed in 'mounts', and mounts done by that command can only be seen
     by that subprocess and its children. When the subprocess exits all
     of its mounts will be unmounted.
-    
+
     '''
     # We need to do mounts in a different namespace. Unfortunately
     # this means we have to in-line the mount commands in the
@@ -601,28 +604,28 @@ def containerised_cmdline(args, cwd='.', root='/', binds=(),
                           writable_paths=None, **kwargs): # pragma: no cover
     '''
     Describe how to run 'args' inside a linux-user-chroot container.
-    
+
     The subprocess will only be permitted to write to the paths we
     specifically allow it to write to, listed in 'writeable paths'. All
     other locations in the file system will be read-only.
-    
+
     The 'root' parameter allows running the command in a chroot, allowing
     the host file system to be hidden completely except for the paths
     below 'root'.
-    
+
     The 'mount_proc' flag enables mounting of /proc inside 'root'.
     Locations from the file system can be bind-mounted inside 'root' by
     setting 'binds' to a list of (src, dest) pairs. The 'dest'
     directory must be inside 'root'.
-    
+
     The 'mounts' parameter allows mounting of arbitrary file-systems,
     such as tmpfs, before running commands, by setting it to a list of
     (mount_point, mount_type, source) triples.
-    
+
     The subprocess will be run in a separate mount namespace. It can
     optionally be run in a separate network namespace too by setting
     'unshare_net'.
-    
+
     '''
 
     if not root.endswith('/'):

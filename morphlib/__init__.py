@@ -37,7 +37,7 @@ __version__ = gitversion.version
 
 
 # List of architectures that Morph supports
-valid_archs = ['armv5l', 'armv7l', 'armv7lhf', 'armv7b', 'testarch', 'x86_32',
+valid_archs = ['armv5l', 'armv6lhf', 'armv7l', 'armv7lhf', 'armv7b', 'testarch', 'x86_32',
                'x86_64', 'ppc64', 'armv8l64', 'armv8b64', 'mips32l',
                'mips32b', 'mips64l', 'mips64b']
 
