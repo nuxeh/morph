@@ -127,12 +127,15 @@ class BootstrapSystemBuilder(morphlib.builder.BuilderBase):
             for s in self.source.native_sources:
                 name = s.name
                 f.write('\necho Building %s\n' % name)
-                f.write('mkdir /%s.inst\n' % name)
-                f.write('env DESTDIR=/%s.inst $SRCDIR/build-%s\n'
+                f.write('if [ -d /%s.inst/%s.build ]; then rm -rf /%s.inst; fi\n' % (name, name, name))
+                f.write('if [ ! -d /%s.inst ]; then\n' % name)
+                f.write('  mkdir /%s.inst\n' % name)
+                f.write('  env DESTDIR=/%s.inst $SRCDIR/build-%s\n'
                         % (name, name))
-                f.write('echo Installing %s\n' % name)
-                f.write('(cd /%s.inst; find . | cpio -umdp /)\n' % name)
-                f.write('if [ -e /sbin/ldconfig ]; then /sbin/ldconfig; fi\n')
+                f.write('  echo Installing %s\n' % name)
+                f.write('  (cd /%s.inst; find . | cpio -umdp /)\n' % name)
+                f.write('  if [ -e /sbin/ldconfig ]; then /sbin/ldconfig; fi\n')
+                f.write('fi\n')
 
             f.write(driver_footer)
         os.chmod(driver_script, 0o777)
@@ -166,7 +169,7 @@ class BootstrapSystemBuilder(morphlib.builder.BuilderBase):
             ('install', False),
             ('post-install', False),
         ]
-        
+
         for step, in_parallel in steps:
             key = '%s-commands' % step
             cmds = m[key]
