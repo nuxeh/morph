@@ -78,5 +78,9 @@ help: |
 
         (See https://www.kernel.org/doc/Documentation/kernel-parameters.txt)
 
+    * CREATE_BOOT_PARTITION: bool: create an ext boot partition for bootloaders
+      (e.g. U-Boot) which do not support btrfs, and need a separate partition.
+      Kernel, dtb, etc, will be copied to the ext partition. The default is 'no'
+
     (See `morph help deploy` for details of how to pass parameters to write
     extensions)
