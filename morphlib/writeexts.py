@@ -164,6 +164,13 @@ class WriteExtension(cliapp.Application):
             os.unlink(location)
             raise
 
+    def make_ext_boot_partition(self, location):
+        try:
+            
+        except BaseException:
+            sys.stderr.write('Error creating ext boot partition')
+            raise
+
     def format_btrfs(self, raw_disk):
         try:
             self.mkfs_btrfs(raw_disk)
