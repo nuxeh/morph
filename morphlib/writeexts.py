@@ -164,11 +164,48 @@ class WriteExtension(cliapp.Application):
             os.unlink(location)
             raise
 
-    def make_ext_boot_partition(self, location):
+    def create_ext_boot_partition(self, location):
         try:
-            
+            '''Create partition map'''
+            '''Format boot partition'''
         except BaseException:
             sys.stderr.write('Error creating ext boot partition')
+            raise
+
+    def copy_boot_files(self, root_location, boot_location)
+        try:
+            with mount(root_location) as mp_root, \
+                 mount(boot_location) as mp_boot:
+
+                boot_factory = os.path.join(mp_boot, 'systems', 'factory')
+                root_factory = os.path.join(mp_boot, 'systems', 'factory')
+                os.makedirs(boot_factory)
+    
+                shutil.copy(os.path.join(root_factory, 'kernel'),
+                            os.path.join(boot_factory))
+    
+                dtb_path = os.path.join(root_factory, 'dtb')
+                if os.path.exists(dtb_path):
+                    shutil.copy(dtb_path, boot_factory)
+    
+                initramfs_path = os.path.join(root_factory, 'initramfs')
+                if os.path.exists(initramfs_path):
+                    shutil.copy(initramfs_path, boot_factory)
+    
+                extlinuxconf_path = os.path.join(mp_root, 'extlinux.conf')
+                if os.path.exists(extlinuxconf_path):
+                    shutil.copy(extlinuxconf_path, mp_boot)
+    
+                bootscr_path = os.path.join(root_factory, 'orig', 'boot',
+                                            'boot.scr')
+                if os.path.exists(bootscr_path):
+                    shutil.copy(bootscr_path, mp_boot)
+    
+                os.symlink('factory',
+                           os.path.join(mp_boot, 'systems', 'default'))
+
+        except BaseException:
+            sys.stderr.write('Error copying files to boot partition')
             raise
 
     def format_btrfs(self, raw_disk):

@@ -42,12 +42,18 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
         else:
             try:
                 if not self.is_device(location):
+                    ''' Write to a disk image '''
                     if self.get_environment_boolean('CREATE_EXT_BOOT_PARTITON'):
-                        with self.created_disk_image(location):
-                            with self.mount(location) as mp:
-                                self.make_ext_boot_partition(location)
-                                self.format_btrfs(mp + '2')
-                            self.create_system(temp_root, location + '2')
+                        image_root = location + '_root'
+                        image_boot = location + '_boot'
+                        with self.created_disk_image(image_root):
+                            self.make_ext_boot_partition() ''''''
+                            self.format_btrfs(image_root)
+                            self.create_system(temp_root, image_root)
+                            with self.created_disk_image(image_boot)
+                                self.copy_boot_files(image_root, image_boot)
+                                self.create_partitioned_image(image_root,
+                                                              image_boot) 
                     else:
                         with self.created_disk_image(location):
                             self.format_btrfs(location)
@@ -55,10 +61,15 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
                     self.status(msg='Disk image has been created at %s' %
                                      location)
                 else:
-                    if self.get_environment_boolean('CREATE_EXT_BOOT_PARTITON'):
-                        self.make_ext_boot_partition(location)
-                        self.format_btrfs(location + '2')
-                        self.create_system(temp_root, location + '2')
+                    ''' Write to a device'''
+                    if self.get_environment_boolean(
+                            'CREATE_EXT_BOOT_PARTITON'):
+                        root_location = location + '2'
+                        boot_location = location + '1'
+                        self.create_ext_boot_partition(location)
+                        self.format_btrfs(root_location)
+                        self.create_system(temp_root, root_location)
+                        self.copy_boot_files(root_location, boot_location) 
                     else:
                         self.format_btrfs(location)
                         self.create_system(temp_root, location)
