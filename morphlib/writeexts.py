@@ -175,9 +175,7 @@ class WriteExtension(cliapp.Application):
             p.communicate()
 
             '''Format boot partition'''
-            self.status(msg='Formatting ext4 boot partition')
-            subprocess.check_call(['/usr/sbin/mkfs.ext4',
-                                   '-L', 'boot', '-F', location + '1'])
+            mkfs_ext4(location + '1')
         except BaseException:
             sys.stderr.write('Error creating ext boot partition')
             raise
@@ -332,6 +330,16 @@ class WriteExtension(cliapp.Application):
                 cliapp.runcmd(['mkfs.btrfs','-f', '-L', 'baserock', location])
             else:
                 raise
+
+    def mkfs_ext4(self, location):
+        ''' Create an ext4 filesystem on a disk. '''
+
+        self.status(msg='Creating ext4 filesystem')
+        try:
+            cliapp.runcmd(['mkfs.ext4', '-F', '-L', 'boot', location])
+        except BaseException:
+            sys.stderr.write('Error creating ext filesystem')
+            raise
 
     def get_uuid(self, location):
         '''Get the UUID of a block device's file system.'''

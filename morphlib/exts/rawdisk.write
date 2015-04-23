@@ -52,6 +52,7 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
                              self.created_disk_image(image_boot):
 
                             self.format_btrfs(image_root)
+                            self.mkfs_ext4(image_boot)
                             self.create_system(temp_root, image_root)
                             self.copy_boot_files(image_root, image_boot)
                             self.create_partitioned_image(image_root,
