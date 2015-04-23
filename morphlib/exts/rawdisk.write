@@ -44,7 +44,7 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
                 if not self.is_device(location):
                     ''' Write to a disk image '''
                     if self.get_environment_boolean(
-                                'CREATE_EXT_BOOT_PARTITON'):
+                                'CREATE_EXT_BOOT_PARTITION'):
 
                         image_root = location + '_root'
                         image_boot = location + '_boot'
@@ -65,7 +65,7 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
                 else:
                     ''' Write to a device'''
                     if self.get_environment_boolean(
-                                'CREATE_EXT_BOOT_PARTITON'):
+                                'CREATE_EXT_BOOT_PARTITION'):
                         root_location = location + '2'
                         boot_location = location + '1'
                         self.create_ext_boot_partition(location)
@@ -84,7 +84,8 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
     def upgrade_local_system(self, raw_disk, temp_root):
         self.complete_fstab_for_btrfs_layout(temp_root)
 
-        ''' Check for partition table, and treat accordingly '''
+        ''' Check for partition table, and treat accordingly
+            in self.mount()? could check partition and automatically mount at correct offset for root partition '''
 
         with self.mount(raw_disk) as mp:
             version_label = self.get_version_label(mp)
