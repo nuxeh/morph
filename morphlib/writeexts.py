@@ -166,19 +166,31 @@ class WriteExtension(cliapp.Application):
 
     def create_ext_boot_partition(self, location):
         try:
-            '''Create partition map'''
+            '''Create partition table'''
+            self.status(msg='Partitioning target device')
+            p = subprocess.Popen(['/sbin/sfdisk', '-uM', location],
+                                 stdin=subprocess.PIPE)
+            p.stdin.write(',250,83,*\n')
+            p.stdin.write(',,83,\n')
+            p.communicate()
+
             '''Format boot partition'''
+            self.status(msg='Formatting ext4 boot partition')
+            subprocess.check_call(['/usr/sbin/mkfs.ext4',
+                                   '-L', 'boot', '-F', location + '1'])
         except BaseException:
             sys.stderr.write('Error creating ext boot partition')
             raise
 
-    def copy_boot_files(self, root_location, boot_location)
+    def copy_boot_files(self, root_location, boot_location):
+        ''' Copy files from rootfs to boot partition '''
         try:
+            self.status(msg='Copying files to boot partition')
             with mount(root_location) as mp_root, \
                  mount(boot_location) as mp_boot:
 
                 boot_factory = os.path.join(mp_boot, 'systems', 'factory')
-                root_factory = os.path.join(mp_boot, 'systems', 'factory')
+                root_factory = os.path.join(mp_root, 'systems', 'factory')
                 os.makedirs(boot_factory)
     
                 shutil.copy(os.path.join(root_factory, 'kernel'),
@@ -206,6 +218,18 @@ class WriteExtension(cliapp.Application):
 
         except BaseException:
             sys.stderr.write('Error copying files to boot partition')
+            raise
+
+    def create_partitioned_image(self, image_final,
+                                 image_root, image_boot):
+        ''' Create a partitioned image from a boot image and root image '''
+        try:
+           '''with create
+           create_ext_boot_partition(image_final) '''
+           self.status(msg='boot size %d' % os.path.getsize(image_boot))
+           self.status(msg='root size %d' % os.path.getsize(image_root))
+        except BaseException:
+            sys.stderr.write('Error creating partitioned disk image')
             raise
 
     def format_btrfs(self, raw_disk):

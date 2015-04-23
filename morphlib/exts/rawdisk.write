@@ -43,16 +43,18 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
             try:
                 if not self.is_device(location):
                     ''' Write to a disk image '''
-                    if self.get_environment_boolean('CREATE_EXT_BOOT_PARTITON'):
+                    if self.get_environment_boolean(
+                                'CREATE_EXT_BOOT_PARTITON'):
+
                         image_root = location + '_root'
                         image_boot = location + '_boot'
-                        with self.created_disk_image(image_root):
-                            self.make_ext_boot_partition() ''''''
+                        with self.created_disk_image(image_root), \
+                             self.created_disk_image(image_boot):
+
                             self.format_btrfs(image_root)
                             self.create_system(temp_root, image_root)
-                            with self.created_disk_image(image_boot)
-                                self.copy_boot_files(image_root, image_boot)
-                                self.create_partitioned_image(image_root,
+                            self.copy_boot_files(image_root, image_boot)
+                            self.create_partitioned_image(image_root,
                                                               image_boot) 
                     else:
                         with self.created_disk_image(location):
@@ -63,7 +65,7 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
                 else:
                     ''' Write to a device'''
                     if self.get_environment_boolean(
-                            'CREATE_EXT_BOOT_PARTITON'):
+                                'CREATE_EXT_BOOT_PARTITON'):
                         root_location = location + '2'
                         boot_location = location + '1'
                         self.create_ext_boot_partition(location)
@@ -81,6 +83,8 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
 
     def upgrade_local_system(self, raw_disk, temp_root):
         self.complete_fstab_for_btrfs_layout(temp_root)
+
+        ''' Check for partition table, and treat accordingly '''
 
         with self.mount(raw_disk) as mp:
             version_label = self.get_version_label(mp)
