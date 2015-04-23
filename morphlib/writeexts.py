@@ -186,8 +186,8 @@ class WriteExtension(cliapp.Application):
         ''' Copy files from rootfs to boot partition '''
         try:
             self.status(msg='Copying files to boot partition')
-            with mount(root_location) as mp_root, \
-                 mount(boot_location) as mp_boot:
+            with self.mount(root_location) as mp_root, \
+                 self.mount(boot_location) as mp_boot:
 
                 boot_factory = os.path.join(mp_boot, 'systems', 'factory')
                 root_factory = os.path.join(mp_root, 'systems', 'factory')
