@@ -192,27 +192,27 @@ class WriteExtension(cliapp.Application):
                 boot_factory = os.path.join(mp_boot, 'systems', 'factory')
                 root_factory = os.path.join(mp_root, 'systems', 'factory')
                 os.makedirs(boot_factory)
-    
+
                 shutil.copy(os.path.join(root_factory, 'kernel'),
                             os.path.join(boot_factory))
-    
+
                 dtb_path = os.path.join(root_factory, 'dtb')
                 if os.path.exists(dtb_path):
                     shutil.copy(dtb_path, boot_factory)
-    
+
                 initramfs_path = os.path.join(root_factory, 'initramfs')
                 if os.path.exists(initramfs_path):
                     shutil.copy(initramfs_path, boot_factory)
-    
+
                 extlinuxconf_path = os.path.join(mp_root, 'extlinux.conf')
                 if os.path.exists(extlinuxconf_path):
                     shutil.copy(extlinuxconf_path, mp_boot)
-    
+
                 bootscr_path = os.path.join(root_factory, 'orig', 'boot',
                                             'boot.scr')
                 if os.path.exists(bootscr_path):
                     shutil.copy(bootscr_path, mp_boot)
-    
+
                 os.symlink('factory',
                            os.path.join(mp_boot, 'systems', 'default'))
 
@@ -228,6 +228,8 @@ class WriteExtension(cliapp.Application):
            create_ext_boot_partition(image_final) '''
            self.status(msg='boot size %d' % os.path.getsize(image_boot))
            self.status(msg='root size %d' % os.path.getsize(image_root))
+
+           ''' Clean up '''
         except BaseException:
             sys.stderr.write('Error creating partitioned disk image')
             raise
