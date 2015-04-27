@@ -42,7 +42,7 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
         else:
             try:
                 if not self.is_device(location):
-                    ''' Write to a disk image '''
+                    # Write to a disk image
                     if self.get_environment_boolean(
                                 'CREATE_EXT_BOOT_PARTITION'):
 
@@ -64,7 +64,7 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
                     self.status(msg='Disk image has been created at %s' %
                                      location)
                 else:
-                    ''' Write to a device'''
+                    #  Write to a device
                     if self.get_environment_boolean(
                                 'CREATE_EXT_BOOT_PARTITION'):
                         root_location = location + '2'
