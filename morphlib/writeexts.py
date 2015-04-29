@@ -166,8 +166,9 @@ class WriteExtension(cliapp.Application):
             raise
 
     def create_ext_boot_partition(self, location):
+        ''' Create an ext boot partition '''
         try:
-            '''Create partition table'''
+            # Create partition table
             self.status(msg='Partitioning target device')
             p = subprocess.Popen(['/sbin/sfdisk', '-uM', location],
                                  stdin=subprocess.PIPE)
@@ -175,7 +176,7 @@ class WriteExtension(cliapp.Application):
             p.stdin.write(',,83,\n')
             p.communicate()
 
-            '''Format boot partition'''
+            # Format boot partition
             mkfs_ext4(location + '1')
         except BaseException:
             sys.stderr.write('Error creating ext boot partition')
