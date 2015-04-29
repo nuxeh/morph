@@ -177,7 +177,7 @@ class WriteExtension(cliapp.Application):
             p.communicate()
 
             # Format boot partition
-            mkfs_ext4(location + '1')
+            self.mkfs_ext4(location + '1')
         except BaseException:
             sys.stderr.write('Error creating ext boot partition')
             raise
