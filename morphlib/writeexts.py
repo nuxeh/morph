@@ -14,6 +14,7 @@
 
 
 import cliapp
+import subprocess
 import logging
 import os
 import re
