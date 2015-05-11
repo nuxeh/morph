@@ -1,0 +1,52 @@
+# Specify partitions in the order they should go on the disk
+start offset: 2048
+partitions:
+- description: pre-loader
+#  label: pre-loader
+#  number: 4
+#  boot: yes/true
+  size: 1M
+  type: A2
+#  type: 0xA2
+  format: none
+  files:
+    - cheese
+    - fish
+    - salmon
+    - lemonade
+    - verify
+- description: empty space
+  size: 1M
+  format: none
+  type: none
+- description: boot
+#  number: 1
+  size: 100
+  boot: yes
+  format: ext4
+  type: 0b
+  files: test.tst
+#- description: boot2
+#  type: rootfs
+#  fdtype: 'probably not' 
+#  number: 2
+#  size: 123
+#  format: a2
+#  files: cheese, fish, salmon
+- description: root
+#  number: 1
+  format: btrfs
+  size: 42M # Max
+  type: 83
+  files:
+    - cheese
+    - fish
+    - salmon
+# Raw partition needs dd
+
+# 1:
+#   name: cheese
+#   thing: other
+
+# Handle 0xAB types gracefully
+# Boot flag!
