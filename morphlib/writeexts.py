@@ -594,6 +594,9 @@ class WriteExtension(cliapp.Application):
         '''Parse a yes/no boolean passed through the environment.'''
 
         value = os.environ.get(variable, 'no').lower()
+        return get_boolean(value)
+
+    def get_boolean(self, value)
         if value in ['no', '0', 'false']:
             return False
         elif value in ['yes', '1', 'true']:
