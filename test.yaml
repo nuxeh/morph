@@ -1,12 +1,12 @@
 # Specify partitions in the order they should go on the disk
-start offset: 2048
+start_offset: 2048
 partitions:
 - description: pre-loader
 #  label: pre-loader
 #  number: 4
 #  boot: yes/true
   size: 1M
-  type: A2
+  fdisk_type: A2
 #  type: 0xA2
   format: none
   files:
@@ -24,7 +24,7 @@ partitions:
   size: 100
   boot: yes
   format: ext4
-  type: 0b
+  fdisk_type: 0b
   files: test.tst
 #- description: boot2
 #  type: rootfs
@@ -36,8 +36,9 @@ partitions:
 - description: root
 #  number: 1
   format: btrfs
+  type: rootfs
   size: 42M # Max
-  type: 83
+  fdisk_type: 83
   files:
     - cheese
     - fish

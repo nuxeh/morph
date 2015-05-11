@@ -7,7 +7,6 @@ valid_filesystem_formats = ['btrfs', 'ext4', 'vfat']
 def load_partition_data():
     with open('test.yaml', 'r') as f:
          partspec = yaml.load(f)
-    #start_offset = partspec['start offset']
     return partspec
 
     print start_offset
@@ -82,23 +81,20 @@ def process_partition_offsets(partition_data):
     ''' Update offsets (sectors) and sizes (bytes) for each partition '''
     total_size = 0
     partitions = partition_data['partitions']
-    offset = partition_data['start offset']
+    offset = partition_data['start_offset']
     for partition in partitions:
         size_bytes = _parse_size(str(partition['size'])) 
-        partition['size'] = size_bytes 
         total_size += size_bytes
         size_sectors = (size_bytes / 512 +
                       ((size_bytes % 512) != 0) * 1)
         partition['size_sectors'] = size_sectors
         partition['start'] = offset
-        print "start: " + str(partition['start'])
         partition['end'] = offset + size_sectors
-        print "end: " + str(partition['end'])
         offset += size_sectors + 1
 
     # Compare with DISK_SIZE
     print total_size
-    if total_size > size:
+    if total_size > size: # TODO
         print "Requested size exceeds disk image size"
 
     print total_size
@@ -128,7 +124,7 @@ def create_partition_table(location, partition_data):
     p.stdin.write("o\n")
     for partition in partitions:
         # Create partitions
-        if partition['type'] != 'none':
+        if partition['fdisk_type'] != 'none':
             cmd = ("n\n"
                    "p\n"
                    "" + str(part_num) + "\n"
@@ -143,11 +139,11 @@ def create_partition_table(location, partition_data):
                 # number when setting the type of the
                 # first created partition
                 cmd += str(part_num) + "\n"
-            cmd += str(partition['type']) + "\n"
+            cmd += str(partition['fdisk_type']) + "\n"
             p.stdin.write(cmd)
 
             # Set boot flag
-            if partition['boot']:
+            if get_boolean(partition['boot']):
                 cmd = ("a\n"
                 if part_num > 1:
                     cmd += partnum + "\n"
@@ -177,13 +173,15 @@ def create_loopback():
 
 def remove_loopback():
 
-def create_partition_filesystems(partition_data):
+def create_filesystems(partition_data):
+# For all operations
     
 
 def copy_files():
 
 def direct_write_file():
 
+# default one partition partition map
 
 # USE_PARTITIONING=yes
 # PARTITION_MAP=file
@@ -191,7 +189,7 @@ def direct_write_file():
 partition_data = load_partition_data()
 process_partition_offsets(partition_data)
 create_partition_table(location, partition_data)
-
+print partition_data
 
 
 
