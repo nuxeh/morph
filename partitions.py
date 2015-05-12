@@ -2,7 +2,10 @@ import yaml
 import re
 import subprocess
 import cliapp
+
 import sys
+import os
+import stat
 
 recognised_filesystem_formats = ['btrfs', 'ext4', 'vfat']
 
@@ -88,7 +91,6 @@ def process_partition_data(partition_data):
     offset = partition_data['start_offset']
     part_num = 1
     for partition in partitions:
-
         size_bytes = _parse_size(str(partition['size'])) 
         total_size += size_bytes
         size_sectors = (size_bytes / 512 +
@@ -106,6 +108,13 @@ def process_partition_data(partition_data):
         partition['number'] = part_num
         part_num += 1
 
+        print 'Number:   ' + str(partition['number'])
+        print '  Start:  ' + str(partition['start'])
+        print '  End:    ' + str(partition['end'])
+        print '  Ftype:  ' + str(partition['fdisk_type'])
+        print '  Format: ' + str(partition['format'])
+        print '  Size:   ' + str(partition['size'])
+
     # Compare with DISK_SIZE
     print total_size
     if total_size > size: # TODO
@@ -117,24 +126,25 @@ def process_validate_partitions():
     # Check duplicated rootfs (an at least one)
     # fdisk_type, format, and size are mandatory
     # Maximum 4 partitions
+    # invalid filesystem types, default is none
 
 
 location = 'test.img'
-
+# image must already exist
 def create_partition_table(location, partition_data):
 
-    out_file = open("out_file", 'w')
+    print "Creating partition table"
+
     partitions = partition_data['partitions']
     p = subprocess.Popen(["fdisk", location],
                          stdin=subprocess.PIPE,
-                         stdout=sys.stdout, stderr=subprocess.PIPE)
-#                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#                         stdout=sys.stdout, stderr=sys.stdout)
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     # Create a new partition table
     p.stdin.write("o\n")
     for partition in partitions:
         part_num = partition['number']
-        print part_num
         # Create partitions
         if partition['fdisk_type'] != 'none':
             cmd = ("n\n"
@@ -142,7 +152,6 @@ def create_partition_table(location, partition_data):
                    "" + str(part_num) + "\n"
                    "" + str(partition['start']) + "\n"
                    "" + str(partition['end']) + "\n")
-            print cmd
             p.stdin.write(cmd)
 
             # Set partition types
@@ -153,15 +162,13 @@ def create_partition_table(location, partition_data):
                 # first created partition
                 cmd += str(part_num) + "\n"
             cmd += str(partition['fdisk_type']) + "\n"
-            print cmd
             p.stdin.write(cmd)
 
             # Set boot flag
-            if partition['boot'] and False:
+            if partition['boot']:
                 cmd = "a\n"
                 if part_num > 1:
                     cmd += str(part_num) + "\n"
-                print cmd
                 p.stdin.write(cmd)
 
     # TODO Catch invalid partition types, etc
@@ -170,7 +177,7 @@ def create_partition_table(location, partition_data):
     cmd = ("w\n"
            "q\n")
     p.stdin.write(cmd)
-    #p.wait()
+    p.wait()
 
     # Probe for new partitions (required?)
     p = subprocess.Popen(["partprobe"])
@@ -180,9 +187,11 @@ def mount_partition(partition_data, part_num):
 
 def create_loopback(location, offset):
     try:
-        device = cliapp.runcmd(['losetup', '--show', 'f',
-                                '-o', partition['start'], location])
-        return device
+        device = cliapp.runcmd(['losetup', '--show', '-f',
+                                '-o', str(offset), location])
+        cliapp.runcmd(['partprobe'])
+
+        return device.rstrip()
     except BaseException:
         print "Error creating loopback"
 
@@ -195,30 +204,37 @@ def detach_loopback(loop_device):
 # For all operations
 
 def create_partition_filesystems(location, partition_data):
+   
+    print "Creating filesystems"
     partitions = partition_data['partitions']
 
     for partition in partitions:
-        if self.is_device(location):
-            device = location + partition['number']
-        else:
-            device = create_loopback(partition)
-
         filesystem = partition['format']
-        if filesystem == 'btrfs':
-            #self.format_btrfs(device)
-            print "TODO: make a btrfs filesystem"
-        elif filesystem in recognised_filesystem_formats:
-            # Do this in verification?
-            cliapp.runcmd(['mkfs.' + filesystem, device])
-        else:
-            raise cliapp.AppException('Unrecognised filesystem format')
+        if filesystem != 'none':
+            if is_device(location):
+                device = location + partition['number']
+                loop = False
+            else:
+                device = create_loopback(location, partition['start'])
+                loop = True
 
-        if not self.is_device(device):
-            detach_loopback(device)
+            if filesystem == 'btrfs':
+                #self.format_btrfs(device)
+                print "TODO: make a btrfs filesystem"
+            elif filesystem in recognised_filesystem_formats:
+                # Do this in verification?
+                cliapp.runcmd(['mkfs.' + filesystem, device])
+            else:
+                raise cliapp.AppException('Unrecognised filesystem format')
 
+            if loop:
+                detach_loopback(device)
 
+def copy_partition_files():
+    print 'TODO'
 
-#def copy_files():
+def copy_files():
+    print 'TODO'
 
 
 # raw file offsets
@@ -233,14 +249,20 @@ def create_partition_filesystems(location, partition_data):
 # PARTITION_MAP=file
 
 partition_data = load_partition_data()
-print partition_data
+#print partition_data
 process_partition_data(partition_data)
-print partition_data
+#print partition_data
 create_partition_table(location, partition_data)
-#reate_partition_filesystems(location, partition_data)
+create_partition_filesystems(location, partition_data)
 print partition_data
 
+def paramtest(one, two, three=0):
+    print one
+    print two
+    print three
 
+paramtest('a','b','c')
+paramtest('a','b')
 
 #            for line in iter(p.stdout.readline, ''):
 #                line = line.replace('\r', '').replace('\n', '')

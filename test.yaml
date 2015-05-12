@@ -14,7 +14,7 @@ partitions:
 - description: empty space
   size: 1M
   format: none
-  type: none
+  fdisk_type: none
 - description: boot
   size: 100
   boot: yes
