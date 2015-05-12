@@ -1,22 +1,15 @@
 import yaml
 import re
 import subprocess
+import cliapp
+import sys
 
-valid_filesystem_formats = ['btrfs', 'ext4', 'vfat']
+recognised_filesystem_formats = ['btrfs', 'ext4', 'vfat']
 
 def load_partition_data():
     with open('test.yaml', 'r') as f:
          partspec = yaml.load(f)
     return partspec
-
-    print start_offset
-
-    print yaml.dump(partspec)
-
-    print partspec['partitions'][0]['size']
-    print partspec['partitions'][2]['size']
-    for afile in partspec['partitions'][3]['files']:
-        print afile
 
 ###############################################################################
 
@@ -64,25 +57,38 @@ def _parse_size(size):
 
     return int(m.group(1)) * factor
 
-def get_boolean(self, value)
-    if value in ['no', '0', 'false']:
+def get_boolean(string):
+    string = str(string).lower()
+    if string in ['no', '0', 'false']:
         return False
-    elif value in ['yes', '1', 'true']:
+    elif string in ['yes', '1', 'true']:
         return True
     else:
-        raise cliapp.AppException('Unexpected value for %s: %s' %
-                                  (variable, value))
+        raise cliapp.AppException('Unexpected value %s' %
+                                  string)
+
+def is_device(location):
+    try:
+        st = os.stat(location)
+        return stat.S_ISBLK(st.st_mode)
+    except OSError as e:
+        if e.errno == errno.ENOENT:
+            return False
+        raise
 
 ###############################################################################
 
+
 size = _parse_size('6G')
 
-def process_partition_offsets(partition_data):
+def process_partition_data(partition_data):
     ''' Update offsets (sectors) and sizes (bytes) for each partition '''
     total_size = 0
     partitions = partition_data['partitions']
     offset = partition_data['start_offset']
+    part_num = 1
     for partition in partitions:
+
         size_bytes = _parse_size(str(partition['size'])) 
         total_size += size_bytes
         size_sectors = (size_bytes / 512 +
@@ -92,21 +98,26 @@ def process_partition_offsets(partition_data):
         partition['end'] = offset + size_sectors
         offset += size_sectors + 1
 
+        if 'boot' in partition.keys():
+            partition['boot'] = get_boolean(partition['boot'])
+        else:
+            partition['boot'] = False
+
+        partition['number'] = part_num
+        part_num += 1
+
     # Compare with DISK_SIZE
     print total_size
     if total_size > size: # TODO
         print "Requested size exceeds disk image size"
 
-    print total_size
-    print partitions
-
-
 def process_validate_partitions():
     print "TODO"
+    # Check duplicated fill
+    # Check duplicated rootfs (an at least one)
+    # fdisk_type, format, and size are mandatory
+    # Maximum 4 partitions
 
-
-#except BaseException:
-#    print "error"
 
 location = 'test.img'
 
@@ -116,13 +127,14 @@ def create_partition_table(location, partition_data):
     partitions = partition_data['partitions']
     p = subprocess.Popen(["fdisk", location],
                          stdin=subprocess.PIPE,
-                         stdout=out_file, stderr=subprocess.PIPE)
+                         stdout=sys.stdout, stderr=subprocess.PIPE)
 #                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    part_num = 1
     # Create a new partition table
     p.stdin.write("o\n")
     for partition in partitions:
+        part_num = partition['number']
+        print part_num
         # Create partitions
         if partition['fdisk_type'] != 'none':
             cmd = ("n\n"
@@ -130,6 +142,7 @@ def create_partition_table(location, partition_data):
                    "" + str(part_num) + "\n"
                    "" + str(partition['start']) + "\n"
                    "" + str(partition['end']) + "\n")
+            print cmd
             p.stdin.write(cmd)
 
             # Set partition types
@@ -140,15 +153,16 @@ def create_partition_table(location, partition_data):
                 # first created partition
                 cmd += str(part_num) + "\n"
             cmd += str(partition['fdisk_type']) + "\n"
+            print cmd
             p.stdin.write(cmd)
 
             # Set boot flag
-            if get_boolean(partition['boot']):
-                cmd = ("a\n"
+            if partition['boot'] and False:
+                cmd = "a\n"
                 if part_num > 1:
-                    cmd += partnum + "\n"
+                    cmd += str(part_num) + "\n"
+                print cmd
                 p.stdin.write(cmd)
-        part_num += 1
 
     # TODO Catch invalid partition types, etc
 
@@ -158,28 +172,60 @@ def create_partition_table(location, partition_data):
     p.stdin.write(cmd)
     #p.wait()
 
-#    if p.returncode != 0:
     # Probe for new partitions (required?)
     p = subprocess.Popen(["partprobe"])
-    p.wait()
-    if p.returncode != 0:
-        print "error: could not reload the partition table from image"
 
 def mount_partition(partition_data, part_num):
-    return device
+    return True
 
-def create_loopback():
-    return device
+def create_loopback(location, offset):
+    try:
+        device = cliapp.runcmd(['losetup', '--show', 'f',
+                                '-o', partition['start'], location])
+        return device
+    except BaseException:
+        print "Error creating loopback"
 
-def remove_loopback():
+def detach_loopback(loop_device):
+    try:
+        out = cliapp.runcmd(['losetup', '-d', loop_device])
+    except BaseException:
+        print "Error detaching loopback"
 
-def create_filesystems(partition_data):
 # For all operations
-    
 
-def copy_files():
+def create_partition_filesystems(location, partition_data):
+    partitions = partition_data['partitions']
 
-def direct_write_file():
+    for partition in partitions:
+        if self.is_device(location):
+            device = location + partition['number']
+        else:
+            device = create_loopback(partition)
+
+        filesystem = partition['format']
+        if filesystem == 'btrfs':
+            #self.format_btrfs(device)
+            print "TODO: make a btrfs filesystem"
+        elif filesystem in recognised_filesystem_formats:
+            # Do this in verification?
+            cliapp.runcmd(['mkfs.' + filesystem, device])
+        else:
+            raise cliapp.AppException('Unrecognised filesystem format')
+
+        if not self.is_device(device):
+            detach_loopback(device)
+
+
+
+#def copy_files():
+
+
+# raw file offsets
+
+#def direct_write_file():
+
+# Self function references
 
 # default one partition partition map
 
@@ -187,8 +233,11 @@ def direct_write_file():
 # PARTITION_MAP=file
 
 partition_data = load_partition_data()
-process_partition_offsets(partition_data)
+print partition_data
+process_partition_data(partition_data)
+print partition_data
 create_partition_table(location, partition_data)
+#reate_partition_filesystems(location, partition_data)
 print partition_data
 
 
