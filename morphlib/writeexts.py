@@ -596,15 +596,15 @@ class WriteExtension(cliapp.Application):
         value = os.environ.get(variable, 'no')
         return get_boolean(value)
 
-    def get_boolean(self, value)
-        value = str(value).lower()
-        if value in ['no', '0', 'false']:
+    def get_boolean(self, string)
+        string = str(string).lower()
+        if string in ['no', '0', 'false']:
             return False
-        elif value in ['yes', '1', 'true']:
+        elif string in ['yes', '1', 'true']:
             return True
         else:
             raise cliapp.AppException('Unexpected value for %s: %s' %
-                                      (variable, value))
+                                      (string, string))
 
     def check_ssh_connectivity(self, ssh_host):
         try:
