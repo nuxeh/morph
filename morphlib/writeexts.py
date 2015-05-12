@@ -603,8 +603,8 @@ class WriteExtension(cliapp.Application):
         elif string in ['yes', '1', 'true']:
             return True
         else:
-            raise cliapp.AppException('Unexpected value for %s: %s' %
-                                      (string, string))
+            raise cliapp.AppException('Unexpected value %s' %
+                                       string)
 
     def check_ssh_connectivity(self, ssh_host):
         try:
