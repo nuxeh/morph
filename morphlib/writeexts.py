@@ -25,6 +25,7 @@ import errno
 import stat
 import contextlib
 import yaml
+import subprocess
 
 import morphlib
 
@@ -736,8 +737,14 @@ class WriteExtension(cliapp.Application):
                         cmd += str(part_num) + "\n"
                     p.stdin.write(cmd)
 
-        # TODO Catch invalid partition types, etc
-        # Fill
+        # Write changes
+        cmd = ("w\n"
+               "q\n")
+        p.stdin.write(cmd)
+        p.wait()
+
+    # Probe for new partitions
+    p = subprocess.Popen(["partprobe"])
 
     # TODO Move these up, cliapp exceptions
 
