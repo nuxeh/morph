@@ -636,13 +636,13 @@ class WriteExtension(cliapp.Application):
     def load_partition_data(self, part_file):
         ''' Load partition data from a yaml specification '''
 
-        #try:
-        with open(part_file, 'r') as f:
-            part_spec = yaml.load(f)
-        return self.process_partition_data(part_spec)
-        #except:
-        #    raise cliapp.AppException(
-        #        'Unable to load partition specification')
+        try:
+            with open(part_file, 'r') as f:
+                part_spec = yaml.load(f)
+            return self.process_partition_data(part_spec)
+        except:
+            raise cliapp.AppException(
+                'Unable to load partition specification')
 
     def process_partition_data(self, partition_data):
         ''' Verify partition data and update offsets (sectors)
@@ -684,6 +684,8 @@ class WriteExtension(cliapp.Application):
             raise cliapp.AppException('DISK_SIZE is not defined')
         if total_size > size:
             raise cliapp.AppException('Requested size exceeds disk image size')
+
+        return partition_data
 
     # TODO
     # Check duplicated fill
