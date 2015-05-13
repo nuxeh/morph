@@ -6,11 +6,16 @@ partitions:
   fdisk_type: A2
   format: none
   files:
-    - cheese
-    - fish
-    - salmon
-    - lemonade
-    - verify
+    - file: cheese
+      dest_dir: /
+      # defaults to /
+    - file: fish
+    - file: salmon
+    - file: lemonade
+    - file: verify
+  raw_files:
+    - file: pony
+    - file: offset
 - description: empty space
   size: 1M
   format: none
@@ -30,7 +35,11 @@ partitions:
     - cheese
     - fish
     - salmon
-
+raw_files:
+- file: cheese
+  offset: 2048
+  # defaults to end of previous file (next available sector?)
+- file: camembert
 # 1:
 #   name: cheese
 #   thing: other

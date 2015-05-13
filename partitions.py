@@ -79,6 +79,25 @@ def is_device(location):
             return False
         raise
 
+def mount(location, offset=0):
+    self.status(msg='Mounting filesystem')
+    try:
+        mount_point = tempfile.mkdtemp()
+        if self.is_device(location):
+            cliapp.runcmd(['mount', location, mount_point])
+        else:
+            cliapp.runcmd(['mount', '-o', 'loop,offset=' + str(offset),
+                          location, mount_point])
+    except BaseException as e:
+        sys.stderr.write('Error mounting filesystem')
+        os.rmdir(mount_point)
+        raise
+    try:
+        yield mount_point
+    finally:
+        self.status(msg='Unmounting filesystem')
+        cliapp.runcmd(['umount', mount_point])
+        os.rmdir(mount_point)
 ###############################################################################
 
 
@@ -230,39 +249,51 @@ def create_partition_filesystems(location, partition_data):
             if loop:
                 detach_loopback(device)
 
-def copy_partition_files():
-    print 'TODO'
+def copy_partition_files(location, temp_root, partition_data):
+
+    print 'Copying files to partitions'
+    partitions = partition_data['partitions']
+
+    for partition in partitions:
+        offset = partition['start']
+        with mount(location, offset) as mp:
+            print mp
+            files = partition['files']
+            for file in files:
+                dest_dir = ''
+                if 'dest_dir' in file.keys():
+                    dest_dir = re.sub('^/', '', file['dest_dir'])
+                target = os.path.join(mp, dest_dir)
+                print target
+                #os.makedirs(os.path.join(mp, dest_dir))
+                #shutil.copy(file['file'], target)
 
 def copy_files():
     print 'TODO'
 
 
 # raw file offsets
+# raw file in partition definition
 
 #def direct_write_file():
 
 # Self function references
+# Fill size
+# Exception handling
 
-# default one partition partition map
+# PARTITION_FILE=rocketboard/partitions
 
 # USE_PARTITIONING=yes
 # PARTITION_MAP=file
 
 partition_data = load_partition_data()
-#print partition_data
 process_partition_data(partition_data)
-#print partition_data
-create_partition_table(location, partition_data)
-create_partition_filesystems(location, partition_data)
+#create_partition_table(location, partition_data)
+#create_partition_filesystems(location, partition_data)
+temp_root = './'
+copy_partition_files(location, temp_root, partition_data)
+
 print partition_data
-
-def paramtest(one, two, three=0):
-    print one
-    print two
-    print three
-
-paramtest('a','b','c')
-paramtest('a','b')
 
 #            for line in iter(p.stdout.readline, ''):
 #                line = line.replace('\r', '').replace('\n', '')
