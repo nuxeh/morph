@@ -599,10 +599,10 @@ class WriteExtension(cliapp.Application):
             return self.get_boolean(value)
         except:
             raise cliapp.AppException('Unexpected value for %s: %s' %
-                                       variable, value)
+                                       (variable, value))
 
-    def get_boolean(self, value)
-        value = str(string).lower()
+    def get_boolean(self, value):
+        value = str(value).lower()
         if value in ['no', '0', 'false']:
             return False
         elif value in ['yes', '1', 'true']:
