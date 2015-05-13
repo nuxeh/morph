@@ -1,0 +1,38 @@
+# Specify partitions in the order they should go on the disk
+start_offset: 2048
+partitions:
+- description: pre-loader
+  size: 1M
+  fdisk_type: A2
+  format: none
+  files:
+    - cheese
+    - fish
+    - salmon
+    - lemonade
+    - verify
+- description: empty space
+  size: 1M
+  format: none
+  type: none
+- description: boot
+  size: 100
+  boot: yes
+  format: ext4
+  fdisk_type: 0b
+  files: test.tst
+- description: root
+  format: btrfs
+  type: rootfs
+  size: 42M # Fill
+  fdisk_type: 83
+  files:
+    - cheese
+    - fish
+    - salmon
+
+# 1:
+#   name: cheese
+#   thing: other
+
+# Handle 0xAB types gracefully
