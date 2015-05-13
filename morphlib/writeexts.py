@@ -595,7 +595,11 @@ class WriteExtension(cliapp.Application):
         '''Parse a yes/no boolean passed through the environment.'''
 
         value = os.environ.get(variable, 'no')
-        return get_boolean(value)
+        try:
+            return get_boolean(value)
+        except:
+            raise cliapp.AppException('Unexpected value for %s: %s' %
+                                       variable, value)
 
     def get_boolean(self, string)
         string = str(string).lower()
