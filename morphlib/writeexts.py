@@ -678,9 +678,12 @@ class WriteExtension(cliapp.Application):
             self.status(msg='  Size:   ' + str(partition['size']))
 
         # Compare with DISK_SIZE
-        self.status(msg=str(total_size))
-        if total_size > size: # TODO
-            self.status(msg="Requested size exceeds disk image size")
+        self.status(msg='Total image size: ' + str(total_size))
+        size = self.get_disk_size()
+        if not size:
+            raise cliapp.AppException('DISK_SIZE is not defined')
+        if total_size > size:
+            raise cliapp.AppException('Requested size exceeds disk image size')
 
     # TODO
     # Check duplicated fill
