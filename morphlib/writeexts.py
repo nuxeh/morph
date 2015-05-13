@@ -631,3 +631,173 @@ class WriteExtension(cliapp.Application):
             if e.errno == errno.ENOENT:
                 return False
             raise
+
+    def load_partition_data(self, part_file):
+        ''' Load partition data from a yaml specification '''
+
+        try:
+            with open(part_file, 'r') as f:
+                 partspec = yaml.load(f)
+            return self.process_partition_data(part_spec)
+        except:
+            raise cliapp.AppException(
+                'Unable to load partition specification')
+
+    def process_partition_data(self, partition_data):
+        ''' Verify partition data and update offsets (sectors)
+            and sizes (bytes) for each partition '''
+
+        total_size = 0
+        partitions = partition_data['partitions']
+        offset = partition_data['start_offset']
+        part_num = 1
+        for partition in partitions:
+            size_bytes = _parse_size(str(partition['size']))
+            total_size += size_bytes
+            size_sectors = (size_bytes / 512 +
+                          ((size_bytes % 512) != 0) * 1)
+            partition['size_sectors'] = size_sectors
+            partition['start'] = offset
+            partition['end'] = offset + size_sectors
+            offset += size_sectors + 1
+
+            if 'boot' in partition.keys():
+                partition['boot'] = self.get_boolean(partition['boot'])
+            else:
+                partition['boot'] = False
+
+            partition['number'] = part_num
+            part_num += 1
+
+            self.status(msg='Number:   ' + str(partition['number']))
+            self.status(msg='  Start:  ' + str(partition['start']))
+            self.status(msg='  End:    ' + str(partition['end']))
+            self.status(msg='  Ftype:  ' + str(partition['fdisk_type']))
+            self.status(msg='  Format: ' + str(partition['format']))
+            self.status(msg='  Size:   ' + str(partition['size']))
+
+        # Compare with DISK_SIZE
+        self.status(msg=str(total_size))
+        if total_size > size: # TODO
+            self.status(msg="Requested size exceeds disk image size")
+
+    # TODO
+    # Check duplicated fill
+    # Check duplicated rootfs (an at least one)
+    # fdisk_type, format, and size are mandatory
+    # Maximum 4 partitions
+    # invalid filesystem types, default is none
+    # Trying to add files to unformatted partition
+
+
+    def create_partition_table(self, location, partition_data):
+        ''' Use fdisk to create a partition table '''
+
+        self.status(msg="Creating partition table")
+
+        partitions = partition_data['partitions']
+        p = subprocess.Popen(["fdisk", location],
+                             stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        # Create a new partition table
+        p.stdin.write("o\n")
+        for partition in partitions:
+            part_num = partition['number']
+            # Create partitions
+            if partition['fdisk_type'] != 'none':
+                cmd = ("n\n"
+                       "p\n"
+                       "" + str(part_num) + "\n"
+                       "" + str(partition['start']) + "\n"
+                       "" + str(partition['end']) + "\n")
+                p.stdin.write(cmd)
+
+                # Set partition types
+                cmd = "t\n"
+                if part_num > 1:
+                    # fdisk does not ask for a partition
+                    # number when setting the type of the
+                    # first created partition
+                    cmd += str(part_num) + "\n"
+                cmd += str(partition['fdisk_type']) + "\n"
+                p.stdin.write(cmd)
+
+                # Set boot flag
+                if partition['boot']:
+                    cmd = "a\n"
+                    if part_num > 1:
+                        cmd += str(part_num) + "\n"
+                    p.stdin.write(cmd)
+
+        # TODO Catch invalid partition types, etc
+        # Fill
+
+    # TODO Move these up, cliapp exceptions
+
+    def create_loopback(self, location, offset):
+        try:
+            device = cliapp.runcmd(['losetup', '--show', '-f',
+                                    '-o', str(offset), location])
+            cliapp.runcmd(['partprobe'])
+            return device.rstrip()
+        except BaseException:
+            self.status(msg="Error creating loopback")
+
+    def detach_loopback(self, loop_device):
+        try:
+            cliapp.runcmd(['losetup', '-d', loop_device])
+        except BaseException:
+            self.status(msg="Error detaching loopback")
+
+    def create_partition_filesystems(self, location, partition_data):
+        ''' Create all required filesystems on a partitioned device/image '''
+
+        self.status(msg="Creating filesystems")
+        partitions = partition_data['partitions']
+
+        for partition in partitions:
+            filesystem = partition['format']
+            if filesystem != 'none':
+                if self.is_device(location):
+                    device = location + partition['number']
+                    loop = False
+                else:
+                    device = self.create_loopback(
+                                  location, partition['start'])
+                    loop = True
+
+                if filesystem == 'btrfs':
+                    self.status(msg='TODO self.format_btrfs(device)')
+                elif filesystem in recognised_filesystem_formats:
+                    # TODO: do this in verification
+                    cliapp.runcmd(['mkfs.' + filesystem, device])
+                else:
+                    raise cliapp.AppException('Unrecognised filesystem format')
+
+                if loop:
+                    detach_loopback(device)
+
+    def copy_partition_files(self, location, temp_root, partition_data):
+        ''' Copy files specified in the partition specification
+            to partitions '''
+
+        self.status(msg='Copying files to partitions')
+        partitions = partition_data['partitions']
+
+        for partition in partitions:
+            if partition['format'] != 'none':
+                offset = partition['start']
+                with self.mount(location, offset) as mp:
+                    self.status(msg=str(mp))
+                    files = partition['files']
+                    for file in files:
+                        dest_dir = ''
+                        if 'dest_dir' in file.keys():
+                            dest_dir = re.sub('^/', '', file['dest_dir'])
+                        target = os.path.join(mp, dest_dir)
+                        self.status(msg=str(target))
+                        #os.makedirs(os.path.join(mp, dest_dir))
+                        #shutil.copy(file['file'], target)
+
+# Warn if writing files directly to a formatted partition
