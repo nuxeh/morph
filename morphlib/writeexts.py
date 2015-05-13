@@ -743,9 +743,6 @@ class WriteExtension(cliapp.Application):
         p.stdin.write(cmd)
         p.wait()
 
-    # Probe for new partitions
-    p = subprocess.Popen(["partprobe"])
-
     # TODO Move these up, cliapp exceptions
 
     def create_loopback(self, location, offset):
