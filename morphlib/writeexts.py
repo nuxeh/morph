@@ -777,6 +777,8 @@ class WriteExtension(cliapp.Application):
                                   location, partition['start'])
                     loop = True
 
+                recognised_filesystem_formats = ['btrfs', 'ext4', 'vfat']
+
                 if filesystem == 'btrfs':
                     self.status(msg='TODO self.format_btrfs(device)')
                 elif filesystem in recognised_filesystem_formats:
