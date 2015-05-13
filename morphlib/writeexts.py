@@ -596,7 +596,7 @@ class WriteExtension(cliapp.Application):
 
         value = os.environ.get(variable, 'no')
         try:
-            return get_boolean(value)
+            return self.get_boolean(value)
         except:
             raise cliapp.AppException('Unexpected value for %s: %s' %
                                        variable, value)
