@@ -281,6 +281,7 @@ def copy_files():
 # Self function references
 # Fill size
 # Exception handling
+# Warn if writing over a formatted partition
 
 # PARTITION_FILE=rocketboard/partitions
 
