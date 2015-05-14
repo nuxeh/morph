@@ -789,7 +789,7 @@ class WriteExtension(cliapp.Application):
                     raise cliapp.AppException('Unrecognised filesystem format')
 
                 if loop:
-                    detach_loopback(device)
+                    self.detach_loopback(device)
 
     def copy_partition_files(self, location, temp_root, partition_data):
         ''' Copy files specified in the partition specification
