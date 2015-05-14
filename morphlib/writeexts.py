@@ -749,16 +749,17 @@ class WriteExtension(cliapp.Application):
         try:
             device = cliapp.runcmd(['losetup', '--show', '-f',
                                     '-o', str(offset), location])
-            cliapp.runcmd(['partprobe'])
             return device.rstrip()
         except BaseException:
             self.status(msg="Error creating loopback")
+            raise
 
     def detach_loopback(self, loop_device):
         try:
             cliapp.runcmd(['losetup', '-d', loop_device])
         except BaseException:
             self.status(msg="Error detaching loopback")
+            raise
 
     def create_partition_filesystems(self, location, partition_data):
         ''' Create all required filesystems on a partitioned device/image '''
