@@ -679,12 +679,13 @@ class WriteExtension(cliapp.Application):
             self.status(msg='  Size:   ' + str(partition['size']))
 
         # Compare with DISK_SIZE
-        self.status(msg='Total image size: ' + str(total_size))
+        self.status(msg='Total image size: %s bytes' % str(total_size))
         size = self.get_disk_size()
         if not size:
             raise cliapp.AppException('DISK_SIZE is not defined')
         if total_size > size:
-            raise cliapp.AppException('Requested size exceeds disk image size')
+            raise cliapp.AppException(
+                'Requested total size exceeds disk image size')
 
         return partition_data
 
@@ -781,9 +782,10 @@ class WriteExtension(cliapp.Application):
                 recognised_filesystem_formats = ['btrfs', 'ext4', 'vfat']
 
                 if filesystem == 'btrfs':
-                    self.status(msg='TODO self.format_btrfs(device)')
+                    self.format_btrfs(device)
                 elif filesystem in recognised_filesystem_formats:
                     # TODO: do this in verification
+                    self.status(msg='Creating %s filesystem' % filesystem)
                     cliapp.runcmd(['mkfs.' + filesystem, device])
                 else:
                     raise cliapp.AppException('Unrecognised filesystem format')
