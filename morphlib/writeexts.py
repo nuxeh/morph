@@ -680,7 +680,7 @@ class WriteExtension(cliapp.Application):
             self.status(msg='  Size:   ' + str(partition['size']))
 
         # Compare with DISK_SIZE
-        self.status(msg='Total image size: %s bytes' % str(total_size))
+        self.status(msg='Total image size: %s bytes' % total_size)
         size = self.get_disk_size()
         if not size:
             raise cliapp.AppException('DISK_SIZE is not defined')
@@ -751,6 +751,7 @@ class WriteExtension(cliapp.Application):
         try:
             device = cliapp.runcmd(['losetup', '--show', '-f',
                                     '-o', str(offset), location])
+            print 'attaching ' + device
             return device.rstrip()
         except BaseException:
             self.status(msg="Error creating loopback")
@@ -759,6 +760,7 @@ class WriteExtension(cliapp.Application):
     def detach_loopback(self, loop_device):
         try:
             cliapp.runcmd(['losetup', '-d', loop_device])
+            print 'detatching ' + loop_device
         except BaseException:
             self.status(msg="Error detaching loopback")
             raise
@@ -787,7 +789,7 @@ class WriteExtension(cliapp.Application):
                 elif filesystem in recognised_filesystem_formats:
                     # TODO: do this in verification
                     self.status(msg='Creating %s filesystem' % filesystem)
-                    cliapp.runcmd(['mkfs.' + filesystem, device])
+                    cliapp.runcmd(['mkfs.' + filesystem, '-F', device])
                 else:
                     raise cliapp.AppException('Unrecognised filesystem format')
 
@@ -802,18 +804,33 @@ class WriteExtension(cliapp.Application):
         partitions = partition_data['partitions']
 
         for partition in partitions:
-            if partition['format'] != 'none':
+            if partition['format'] != 'none' \
+                and 'files' in partition.keys():
                 offset = partition['start']
                 with self.mount(location, offset) as mp:
-                    self.status(msg=str(mp))
                     files = partition['files']
+                    print files
                     for file in files:
-                        dest_dir = ''
-                        if 'dest_dir' in file.keys():
-                            dest_dir = re.sub('^/', '', file['dest_dir'])
-                        target = os.path.join(mp, dest_dir)
-                        self.status(msg=str(target))
-                        #os.makedirs(os.path.join(mp, dest_dir))
-                        #shutil.copy(file['file'], target)
+                        source = os.path.join(temp_root, file['file'])
+                        print source
+                        if os.path.exists(source):
+                            dest_dir = ''
+                            if 'dest_dir' in file.keys():
+                                dest_dir = re.sub('^/', '', file['dest_dir'])
+                            target = os.path.join(mp, dest_dir)
+                            print target
+                            try:
+                                print 'dummy'
+                                if not os.path.exists(target):
+                                    os.makedirs(target)
+                                shutil.copy(source, target)
+                            except:
+                                raise cliapp.AppException(
+                                                      'Error copying files')
+                        else:
+                            raise cliapp.AppException("File doesn't exist: %s"
+                                                          % source)
 
-# Warn if writing files directly to a formatted partition
+
+
+    # Warn if writing files directly to a formatted partition

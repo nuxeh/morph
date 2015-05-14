@@ -14,18 +14,24 @@ partitions:
   fdisk_type: none
 - description: boot
   size: 100M
-  format: vfat
-  fdisk_type: 0b
+  format: ext4
+  fdisk_type: 83
 # ext? ^
-  files:
-  - file: boot/rocketboard-boot.scr
-  - file: boot/rocketboard-zImage 
-  - file: boot/rocketboard-socfpga.dtb
+#  files:
+#  - file: boot/rocketboard-boot.scr
+#    dest_dir: cheese
+#  - file: boot/rocketboard-zImage 
+#  - file: boot/rocketboard-socfpga.dtb
 - description: root
   format: btrfs
   type: rootfs
   size: 4G
   fdisk_type: 83
+  files:
+  - file: boot/rocketboard-boot.scr
+    dest_dir: cheese
+  - file: boot/rocketboard-zImage 
+  - file: boot/rocketboard-socfpga.dtb
 raw_files:
 - file: cheese
   offset: 2048
