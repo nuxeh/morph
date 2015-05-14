@@ -599,9 +599,10 @@ class WriteExtension(cliapp.Application):
         value = os.environ.get(variable, 'no')
         try:
             return self.get_boolean(value)
-        except:
-            raise cliapp.AppException('Unexpected value for %s: %s' %
-                                       (variable, value))
+        except BaseException:
+            self.status(msg='Unexpected value for %s: %s' %
+                       (variable, value))
+            raise
 
     def get_boolean(self, value):
         value = str(value).lower()
@@ -641,9 +642,9 @@ class WriteExtension(cliapp.Application):
             with open(part_file, 'r') as f:
                 part_spec = yaml.load(f)
             return self.process_partition_data(part_spec)
-        except:
-            raise cliapp.AppException(
-                'Unable to load partition specification')
+        except BaseException:
+            self.status(msg='Unable to load partition specification')
+            raise
 
     def process_partition_data(self, partition_data):
         ''' Verify partition data and update offsets (sectors)

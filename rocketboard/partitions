@@ -4,34 +4,28 @@ partitions:
   size: 1M
   fdisk_type: A2
   format: none
-  files:
-    - file: cheese
-    - file: fish
-    - file: salmon
-    - file: lemonade
-    - file: verify
   raw_files:
-    - file: pony
-    - offset: 2048
+  - file: boot/rocketboard-preloader.img
+    offset: 0
+  - file: boot/rocketboard-u-boot.img
 - description: empty space
-  size: 1M
+  size: 5M
   format: none
   fdisk_type: none
 - description: boot
-  size: 100
-  boot: yes
-  format: ext4
+  size: 100M
+  format: vfat
   fdisk_type: 0b
-  files: test.tst
+# ext? ^
+  files:
+  - file: boot/rocketboard-boot.scr
+  - file: boot/rocketboard-zImage 
+  - file: boot/rocketboard-socfpga.dtb
 - description: root
   format: btrfs
   type: rootfs
-  size: 42M
+  size: 4G
   fdisk_type: 83
-  files:
-    - cheese
-    - fish
-    - salmon
 raw_files:
 - file: cheese
   offset: 2048
