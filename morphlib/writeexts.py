@@ -752,18 +752,20 @@ class WriteExtension(cliapp.Application):
     @contextlib.contextmanager
     def create_loopback(self, location, offset=0, size=0):
         ''' Create a loopback device for an image, a partition in an
-            image, not necessarily with a filesystem
+            image, with or without a filesystem
               * offset - offset of the start of a partition in bytes
               * size - limits the size of the partition, in bytes '''
 
         self.status(msg='Creating loopback')
-        print 'size %s' % str(size)
-        print 'offset %s' % str(offset)
         try:
             if not self.is_device(location):
-                device = cliapp.runcmd(['losetup', '--show', '-f',
-                                        '-o', str(offset), '--sizelimit',
-                                        str(size), location]).rstrip()
+                if size and offset:
+                    cmd = ['losetup', '--show', '-f', '-o', str(offset),
+                           '--sizelimit', str(size), location]
+                else:
+                    cmd = ['losetup', '--show', '-f', '-o', str(offset),
+                           location]
+                device = cliapp.runcmd(cmd).rstrip()
             else:
                 raise cliapp.AppException('Can only create loop'
                                           'device for a file')
