@@ -656,6 +656,7 @@ class WriteExtension(cliapp.Application):
         part_num = 1
         for partition in partitions:
             size_bytes = self._parse_size(str(partition['size']))
+            partition['size'] = size_bytes
             total_size += size_bytes
             size_sectors = (size_bytes / 512 +
                           ((size_bytes % 512) != 0) * 1)
@@ -746,24 +747,47 @@ class WriteExtension(cliapp.Application):
         p.wait()
 
     # TODO Move these up, cliapp exceptions
+    # TODO Test this error handling
 
-    def create_loopback(self, location, offset):
+    @contextlib.contextmanager
+    def create_loopback(self, location, offset=0, size=0):
+        self.status(msg='Creating loopback')
+        print 'size %s' % str(size)
+        print 'offset %s' % str(offset)
         try:
-            device = cliapp.runcmd(['losetup', '--show', '-f',
-                                    '-o', str(offset), location])
-            print 'attaching ' + device
-            return device.rstrip()
-        except BaseException:
-            self.status(msg="Error creating loopback")
+            if not self.is_device(location):
+                device = cliapp.runcmd(['losetup', '--show', '-f',
+                                        '-o', str(offset), '--sizelimit',
+                                        str(size), location]).rstrip()
+            else:
+                raise cliapp.AppException('Can only create loop'
+                                          'device for a file')
+        except cliapp.AppException:
+            sys.stderr.write('Error creating loopback')
             raise
+        try:
+            yield device
+        finally:
+            self.status(msg='Detatching loopback: %s' % device)
+            cliapp.runcmd(['losetup', '-d', device])
 
-    def detach_loopback(self, loop_device):
-        try:
-            cliapp.runcmd(['losetup', '-d', loop_device])
-            print 'detatching ' + loop_device
-        except BaseException:
-            self.status(msg="Error detaching loopback")
-            raise
+    def create_filesystem(self, block_device, fstype):
+        recognised_filesystem_formats = ['btrfs', 'ext4', 'vfat']
+
+        if fstype == 'btrfs' and False:
+            self.format_btrfs(block_device)
+        elif fstype in recognised_filesystem_formats:
+            try:
+                self.status(msg='Creating %s filesystem' % fstype)
+                cliapp.runcmd(['mkfs.' + fstype, block_device])
+                cliapp.runcmd('sync')
+            except BaseException: # TODO cliapp.AppException?
+                raise cliapp.AppException(
+                    'Error creating %s filesystem on %s'
+                        % (fstype, block_device))
+        else:
+            raise cliapp.AppException(
+                'Unrecognised filesystem format: %s' % fstype)
 
     def create_partition_filesystems(self, location, partition_data):
         ''' Create all required filesystems on a partitioned device/image '''
@@ -776,25 +800,11 @@ class WriteExtension(cliapp.Application):
             if filesystem != 'none':
                 if self.is_device(location):
                     device = location + partition['number']
-                    loop = False
+                    self.create_filesystem(device, filesystem)
                 else:
-                    device = self.create_loopback(
-                                  location, partition['start'])
-                    loop = True
-
-                recognised_filesystem_formats = ['btrfs', 'ext4', 'vfat']
-
-                if filesystem == 'btrfs':
-                    self.format_btrfs(device)
-                elif filesystem in recognised_filesystem_formats:
-                    # TODO: do this in verification
-                    self.status(msg='Creating %s filesystem' % filesystem)
-                    cliapp.runcmd(['mkfs.' + filesystem, '-F', device])
-                else:
-                    raise cliapp.AppException('Unrecognised filesystem format')
-
-                if loop:
-                    self.detach_loopback(device)
+                    with self.create_loopback(
+                    location, partition['start'], partition['size']) as device:
+                        self.create_filesystem(device, filesystem)
 
     def copy_partition_files(self, location, temp_root, partition_data):
         ''' Copy files specified in the partition specification
@@ -805,22 +815,18 @@ class WriteExtension(cliapp.Application):
 
         for partition in partitions:
             if partition['format'] != 'none' \
-                and 'files' in partition.keys():
+                  and 'files' in partition.keys():
                 offset = partition['start']
                 with self.mount(location, offset) as mp:
                     files = partition['files']
-                    print files
                     for file in files:
                         source = os.path.join(temp_root, file['file'])
-                        print source
                         if os.path.exists(source):
                             dest_dir = ''
                             if 'dest_dir' in file.keys():
                                 dest_dir = re.sub('^/', '', file['dest_dir'])
                             target = os.path.join(mp, dest_dir)
-                            print target
                             try:
-                                print 'dummy'
                                 if not os.path.exists(target):
                                     os.makedirs(target)
                                 shutil.copy(source, target)
@@ -828,7 +834,7 @@ class WriteExtension(cliapp.Application):
                                 raise cliapp.AppException(
                                                       'Error copying files')
                         else:
-                            raise cliapp.AppException("File doesn't exist: %s"
+                            raise cliapp.AppException("File not found: %s"
                                                           % source)
 
 
