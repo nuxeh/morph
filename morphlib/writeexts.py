@@ -173,8 +173,8 @@ class WriteExtension(cliapp.Application):
             sys.stderr.write('Error creating disk image')
             raise
 
-    def create_system(self, temp_root, raw_disk):
-        with self.mount(raw_disk) as mp:
+    def create_system(self, temp_root, raw_disk, offset=0):
+        with self.mount(raw_disk, offset) as mp:
             try:
                 self.create_btrfs_system_layout(
                     temp_root, mp, version_label='factory',
@@ -698,6 +698,7 @@ class WriteExtension(cliapp.Application):
     # Maximum 4 partitions
     # invalid filesystem types, default is none
     # Trying to add files to unformatted partition
+    # Rootfs that's not formatted btrfs
 
 
     def create_partition_table(self, location, partition_data):
@@ -748,7 +749,7 @@ class WriteExtension(cliapp.Application):
 
     # TODO Move these up, cliapp exceptions
     # TODO Test this error handling
-
+# TODO don't force sizelimit on loopback creation
     @contextlib.contextmanager
     def create_loopback(self, location, offset=0, size=0):
         ''' Create a loopback device for an image, a partition in an
@@ -820,13 +821,13 @@ class WriteExtension(cliapp.Application):
         partitions = partition_data['partitions']
 
         for partition in partitions:
-            if partition['format'] != 'none' \
+            if not partition['format'] == 'none' \
                   and 'files' in partition.keys():
                 offset = partition['start'] * 512
                 with self.mount(location, offset) as mp:
                     files = partition['files']
                     for file in files:
-                        source = os.path.join(temp_root, file['file'])
+                        source = os.path.join(temp_root, file['file']) # leading / TODO
                         if os.path.exists(source):
                             dest_dir = ''
                             if 'dest_dir' in file.keys():
@@ -844,5 +845,55 @@ class WriteExtension(cliapp.Application):
                                                           % source)
                     cliapp.runcmd('sync')
 
+    def partition_direct_copy(self, temp_root, location, partition_data):
+        self.status(msg='Writing files directly to image')
+        partitions = partition_data['partitions']
+        for partition in partitions:
+            if 'raw_files' in partition.keys():
+                self.partition_dd(temp_root, location, partition['raw_files'], partition['start'] * 512)
+        if 'raw_files' in partition_data.keys():
+            self.partition_dd(temp_root, location, partition_data['raw_files'], 0)
 
+    def partition_dd(self, temp_root, location, raw_files_data, start_offset):
+        file_offset = start_offset
+        for raw_file in raw_files_data:
+            if 'offset' in raw_file.keys():
+                file_offset = raw_file['offset'] * 512
+            if 'offset_bytes' in raw_file.keys():
+                file_offset = raw_file['offset_bytes']
+            source = os.path.join(temp_root, raw_file['file']) # leading '/' TODO
+            if os.path.exists(source):
+                if not os.path.isdir(source): # TODO check exists
+                    self.dd(location, source, file_offset)
+                    file_offset += os.stat(source).st_size
+                else:
+                    raise cliapp.AppException('Can only dd regular files, not directories')
+            else:
+                raise cliapp.AppException('File not found: %s' % source)
+
+    def dd(self, location, filename, offset):
+        ''' dd filename to a device, offset in bytes '''
+        cliapp.runcmd(['dd', 'if=%s' % filename, 'of=%s' % location, 'bs=1', 'seek=%s' % offset])
+
+    def create_partition_rootfs(self, temp_root, location, partition_data):
+        partitions = partition_data['partitions']
+        for partition in partitions:
+            if 'type' in partition.keys():
+                if partition['type'] == 'rootfs':
+                    self.status(msg='Creating rootfs on partition ' + str(partition['number']))
+                    if self.is_device(location):
+                        self.create_system(temp_root, 'location' + str(partition['number']))
+                    else:
+                        self.create_system(temp_root, location, partition['start'] * 512)
+
+
+
+
+    # Make functions work with real devices
+    # - create rootfs
+    # - copy files
     # Warn if writing files directly to a formatted partition
+    # Rationalise partitions = partition_data['partitions']
+    # Combine copy / dd - split copy into functions, it's quite long
+    # strip leading '/'
+    # rootfs not btrfs
