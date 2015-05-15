@@ -751,6 +751,11 @@ class WriteExtension(cliapp.Application):
 
     @contextlib.contextmanager
     def create_loopback(self, location, offset=0, size=0):
+        ''' Create a loopback device for an image, a partition in an
+            image, not necessarily with a filesystem
+              * offset - offset of the start of a partition in bytes
+              * size - limits the size of the partition, in bytes '''
+
         self.status(msg='Creating loopback')
         print 'size %s' % str(size)
         print 'offset %s' % str(offset)
@@ -780,7 +785,6 @@ class WriteExtension(cliapp.Application):
             try:
                 self.status(msg='Creating %s filesystem' % fstype)
                 cliapp.runcmd(['mkfs.' + fstype, block_device])
-                cliapp.runcmd('sync')
             except BaseException: # TODO cliapp.AppException?
                 raise cliapp.AppException(
                     'Error creating %s filesystem on %s'
@@ -803,7 +807,7 @@ class WriteExtension(cliapp.Application):
                     self.create_filesystem(device, filesystem)
                 else:
                     with self.create_loopback(
-                    location, partition['start'], partition['size']) as device:
+                    location, partition['start'] * 512, partition['size']) as device: # TODO line length
                         self.create_filesystem(device, filesystem)
 
     def copy_partition_files(self, location, temp_root, partition_data):
@@ -816,7 +820,7 @@ class WriteExtension(cliapp.Application):
         for partition in partitions:
             if partition['format'] != 'none' \
                   and 'files' in partition.keys():
-                offset = partition['start']
+                offset = partition['start'] * 512
                 with self.mount(location, offset) as mp:
                     files = partition['files']
                     for file in files:
@@ -836,7 +840,7 @@ class WriteExtension(cliapp.Application):
                         else:
                             raise cliapp.AppException("File not found: %s"
                                                           % source)
-
+                    cliapp.runcmd('sync')
 
 
     # Warn if writing files directly to a formatted partition
