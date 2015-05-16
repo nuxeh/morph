@@ -52,7 +52,8 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
                                                               partition_data)
                             self.copy_partition_files(location, temp_root,
                                                       partition_data)
-
+                            self.create_partition_rootfs(temp_root, location, partition_data)
+                            self.partition_direct_copy(temp_root, location, partition_data)
 
                 else:
                     if not self.is_device(location):
