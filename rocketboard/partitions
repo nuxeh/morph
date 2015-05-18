@@ -2,28 +2,31 @@ start_offset: 2048
 partitions:
 - description: pre-loader
   size: 1M
+  number: 3
   fdisk_type: A2
   format: none
-#  raw_files:
-#  - file: boot/rocketboard-preloader.img
+  raw_files:
+  - file: boot/rocketboard-preloader.bin
 #    offset: 0
-#  - file: boot/rocketboard-u-boot.img
-- description: empty space
-  size: 5M
-  format: none
-  fdisk_type: none
+  - file: boot/rocketboard-u-boot.img
+#- description: empty space
+#  size: 5M
+#  format: none
+#  fdisk_type: none
 - description: boot
+  number: 1
   size: 100M
-  format: ext4
-  fdisk_type: 83
+  format: vfat
+  fdisk_type: 0b
 # ext? ^
   files:
 #  - file: boot/rocketboard-boot.scr
 #    dest_dir: cheese
   - file: boot/rocketboard-zImage 
-#  - file: boot/rocketboard-socfpga.dtb
+  - file: boot/rocketboard.dtb
 - description: root
   format: btrfs
+  number: 2
   type: rootfs
   size: 4G
   fdisk_type: 83

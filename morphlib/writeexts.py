@@ -653,8 +653,12 @@ class WriteExtension(cliapp.Application):
         total_size = 0
         partitions = partition_data['partitions']
         offset = partition_data['start_offset']
+        used_numbers = set()
         part_num = 1
         for partition in partitions:
+            # Allow partition numbering to be overriden
+            if 'number' in partition.keys():
+                part_num = partition['number']
             size_bytes = self._parse_size(str(partition['size']))
             partition['size'] = size_bytes
             total_size += size_bytes
@@ -671,7 +675,13 @@ class WriteExtension(cliapp.Application):
                 partition['boot'] = False
 
             partition['number'] = part_num
-            part_num += 1
+            used_numbers.add(part_num)
+            # Get the next free partition number
+            for n in xrange(1,5):
+                if n not in used_numbers:
+                    part_num = n
+                    break
+            # TODO handle too many partitions used
 
             self.status(msg='Number:   ' + str(partition['number']))
             self.status(msg='  Start:  ' + str(partition['start']))
@@ -688,6 +698,19 @@ class WriteExtension(cliapp.Application):
         if total_size > size:
             raise cliapp.AppException(
                 'Requested total size exceeds disk image size')
+
+        # Re-order the dict for partition number TODO
+#        new_partitions = dict()
+        new_partitions = []
+        for n in range(1,5):
+            for partition in partition_data['partitions']:
+                if partition['number'] == n:
+#                    new_partitions[n] = partition
+                    new_partitions.append(partition)
+
+        print partitions
+        print new_partitions
+        partition_data['partitions'] = new_partitions            
 
         return partition_data
 
@@ -829,6 +852,7 @@ class WriteExtension(cliapp.Application):
                     for file in files:
                         source = os.path.join(temp_root, file['file']) # leading / TODO
                         if os.path.exists(source):
+                            self.status(msg='copying %s' % source)
                             dest_dir = ''
                             if 'dest_dir' in file.keys():
                                 dest_dir = re.sub('^/', '', file['dest_dir'])
@@ -846,7 +870,6 @@ class WriteExtension(cliapp.Application):
                     cliapp.runcmd('sync')
 
     def partition_direct_copy(self, temp_root, location, partition_data):
-        self.status(msg='Writing files directly to image')
         partitions = partition_data['partitions']
         for partition in partitions:
             if 'raw_files' in partition.keys():
@@ -855,6 +878,7 @@ class WriteExtension(cliapp.Application):
             self.partition_dd(temp_root, location, partition_data['raw_files'], 0)
 
     def partition_dd(self, temp_root, location, raw_files_data, start_offset):
+        self.status(msg='Writing files directly to image')
         file_offset = start_offset
         for raw_file in raw_files_data:
             if 'offset' in raw_file.keys():
@@ -873,7 +897,10 @@ class WriteExtension(cliapp.Application):
 
     def dd(self, location, filename, offset):
         ''' dd filename to a device, offset in bytes '''
-        cliapp.runcmd(['dd', 'if=%s' % filename, 'of=%s' % location, 'bs=1', 'seek=%s' % offset])
+        self.status(msg='writing %s, at offset %d bytes' % (filename, offset))
+        cliapp.runcmd(['dd', 'if=%s' % filename, 'of=%s' % location,
+                       'bs=1', 'seek=%s' % offset, 'conv=notrunc'])
+        cliapp.runcmd('sync')
 
     def create_partition_rootfs(self, temp_root, location, partition_data):
         partitions = partition_data['partitions']
