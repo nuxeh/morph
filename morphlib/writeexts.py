@@ -652,6 +652,21 @@ class WriteExtension(cliapp.Application):
 
         total_size = 0
         partitions = partition_data['partitions']
+        for partition in partitions:
+            size_bytes = self._parse_size(str(partition['size']))
+            partition['size'] = size_bytes
+            total_size += size_bytes
+
+        # Compare with DISK_SIZE
+        self.status(msg='Requested image size: %s bytes' % total_size)
+        size = self.get_disk_size()
+        unused_space = size - total_size
+        if not size:
+            raise cliapp.AppException('DISK_SIZE is not defined')
+        if total_size > size:
+            raise cliapp.AppException(
+                'Requested total size exceeds disk image size')
+
         offset = partition_data['start_offset']
         used_numbers = set()
         part_num = 1
@@ -659,9 +674,11 @@ class WriteExtension(cliapp.Application):
             # Allow partition numbering to be overriden
             if 'number' in partition.keys():
                 part_num = partition['number']
-            size_bytes = self._parse_size(str(partition['size']))
-            partition['size'] = size_bytes
-            total_size += size_bytes
+            if 'fill' in partition.keys():
+                if self.get_boolean(partition['fill']):
+                    partition['size'] += (unused_space-1024) # TODO prevent multiple fills, fix
+
+            size_bytes = partition['size']
             size_sectors = (size_bytes / 512 +
                           ((size_bytes % 512) != 0) * 1)
             partition['size_sectors'] = size_sectors
@@ -690,27 +707,15 @@ class WriteExtension(cliapp.Application):
             self.status(msg='  Format: ' + str(partition['format']))
             self.status(msg='  Size:   ' + str(partition['size']))
 
-        # Compare with DISK_SIZE
-        self.status(msg='Total image size: %s bytes' % total_size)
-        size = self.get_disk_size()
-        if not size:
-            raise cliapp.AppException('DISK_SIZE is not defined')
-        if total_size > size:
-            raise cliapp.AppException(
-                'Requested total size exceeds disk image size')
 
-        # Re-order the dict for partition number TODO
-#        new_partitions = dict()
+        # Re-order the dict for partition number
         new_partitions = []
         for n in range(1,5):
             for partition in partition_data['partitions']:
                 if partition['number'] == n:
-#                    new_partitions[n] = partition
                     new_partitions.append(partition)
 
-        print partitions
-        print new_partitions
-        partition_data['partitions'] = new_partitions            
+        partition_data['partitions'] = new_partitions
 
         return partition_data
 
