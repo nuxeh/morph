@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export DISK_SIZE=6G
+export DISK_SIZE=8G
 export PARTITION_FILE='rocketboard/partitions'
 export PYTHONPATH=`pwd`
 #export 

@@ -6,9 +6,9 @@ partitions:
   fdisk_type: A2
   format: none
   raw_files:
-  - file: boot/rocketboard-preloader.bin
+  - file: boot/preloader-mkpimage.bin
 #    offset: 0
-  - file: boot/rocketboard-u-boot.img
+  - file: boot/u-boot.img
 #- description: empty space
 #  size: 5M
 #  format: none
@@ -22,21 +22,20 @@ partitions:
   files:
 #  - file: boot/rocketboard-boot.scr
 #    dest_dir: cheese
-  - file: boot/rocketboard-zImage 
-  - file: boot/rocketboard.dtb
+  - file: boot/zImage
+  - file: boot/socfpga.dtb
 - description: root
   format: btrfs
   number: 2
   type: rootfs
-  size: 4G
+  size: 7900M
   fdisk_type: 83
+  fill: no
 # files:
 #  - file: boot/rocketboard-boot.scr
 #    dest_dir: cheese
 #  - file: boot/rocketboard-zImage 
 #  - file: boot/rocketboard-socfpga.dtb
-#raw_files:
-#- file: cheese
-#  offset: 2048
-#- file: camembert
-#  offset_bytes: 512
+raw_files:
+- file: boot/rocketboard-env.img
+  offset_bytes: 512
