@@ -23,7 +23,7 @@ partitions:
 #  - file: boot/rocketboard-boot.scr
 #    dest_dir: cheese
   - file: boot/zImage
-  - file: boot/socfpga.dtb
+  - file: boot/socfpga-devkit.dtb
 - description: root
   format: btrfs
   number: 2
@@ -37,5 +37,5 @@ partitions:
 #  - file: boot/rocketboard-zImage 
 #  - file: boot/rocketboard-socfpga.dtb
 raw_files:
-- file: boot/rocketboard-env.img
+- file: boot/socfpga-devkit-env.img
   offset_bytes: 512
