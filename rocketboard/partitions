@@ -6,7 +6,7 @@ partitions:
   fdisk_type: A2
   format: none
   raw_files:
-  - file: boot/preloader-mkpimage.bin
+  - file: boot/socfpga-preloader.bin
 #    offset: 0
   - file: boot/u-boot.img
 #- description: empty space
@@ -16,6 +16,7 @@ partitions:
 - description: boot
   number: 1
   size: 100M
+#32M fails
   format: vfat
   fdisk_type: 0b
 # ext? ^
@@ -26,8 +27,8 @@ partitions:
   - file: boot/socfpga-devkit.dtb
 - description: root
   format: btrfs
-  number: 2
   type: rootfs
+  number: 2
   size: 7900M
   fdisk_type: 83
   fill: no

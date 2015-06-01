@@ -45,6 +45,8 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
                 if part_file:
                     if not self.is_device(location):
                         with self.created_disk_image(location):
+                            # mmcblk1pX
+                            # get fdisk errors
                             partition_data = self.load_partition_data(part_file)
                             self.create_partition_table(location,
                                                         partition_data)
