@@ -24,6 +24,7 @@ import tempfile
 import errno
 import stat
 import contextlib
+import yaml
 
 import morphlib
 
@@ -633,3 +634,87 @@ class WriteExtension(cliapp.Application):
             if e.errno == errno.ENOENT:
                 return False
             raise
+
+    def load_partition_data(self, part_file):
+        ''' Load partition data from a yaml specification '''
+
+        try:
+            with open(part_file, 'r') as f:
+                part_spec = yaml.load(f)
+            return self.process_partition_data(part_spec)
+        except BaseException:
+            self.status(msg='Unable to load partition specification')
+            raise
+
+    def process_partition_data(self, partition_data):
+        ''' Verify partition data and update offsets (sectors)
+            and sizes (bytes) for each partition '''
+
+        total_size = 0
+        partitions = partition_data['partitions']
+        for partition in partitions:
+            size_bytes = self._parse_size(str(partition['size']))
+            partition['size'] = size_bytes
+            total_size += size_bytes
+
+        # Compare with DISK_SIZE
+        self.status(msg='Requested image size: %s bytes' % total_size)
+        size = self.get_disk_size()
+        unused_space = size - total_size
+        if not size:
+            raise cliapp.AppException('DISK_SIZE is not defined')
+        if total_size > size:
+            raise cliapp.AppException(
+                'Requested total size exceeds disk image size')
+
+        offset = partition_data['start_offset']
+        used_numbers = set()
+        part_num = 1
+        for partition in partitions:
+            # Allow partition numbering to be overriden
+            if 'number' in partition.keys():
+                part_num = partition['number']
+            if 'fill' in partition.keys():
+                if self.get_boolean(partition['fill']):
+                    partition['size'] += (unused_space-1024) # TODO prevent multiple fills, fix
+
+            size_bytes = partition['size']
+            size_sectors = (size_bytes / 512 +
+                          ((size_bytes % 512) != 0) * 1)
+            partition['size_sectors'] = size_sectors
+            partition['start'] = offset
+            partition['end'] = offset + size_sectors
+            offset += size_sectors + 1
+
+            if 'boot' in partition.keys():
+                partition['boot'] = self.get_boolean(partition['boot'])
+            else:
+                partition['boot'] = False
+
+            partition['number'] = part_num
+            used_numbers.add(part_num)
+            # Get the next free partition number
+            for n in xrange(1,5):
+                if n not in used_numbers:
+                    part_num = n
+                    break
+            # TODO handle too many partitions used
+
+            self.status(msg='Number:   ' + str(partition['number']))
+            self.status(msg='  Start:  ' + str(partition['start']))
+            self.status(msg='  End:    ' + str(partition['end']))
+            self.status(msg='  Ftype:  ' + str(partition['fdisk_type']))
+            self.status(msg='  Format: ' + str(partition['format']))
+            self.status(msg='  Size:   ' + str(partition['size']))
+
+
+        # Re-order the dict for partition number
+        new_partitions = []
+        for n in range(1,5):
+            for partition in partition_data['partitions']:
+                if partition['number'] == n:
+                    new_partitions.append(partition)
+
+        partition_data['partitions'] = new_partitions
+
+        return partition_data
