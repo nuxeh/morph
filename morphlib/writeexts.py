@@ -639,6 +639,7 @@ class WriteExtension(cliapp.Application):
         ''' Load partition data from a yaml specification '''
 
         try:
+            self.status(msg='Opening partition specification: %s' % part_file)
             with open(part_file, 'r') as f:
                 part_spec = yaml.load(f)
             return self.process_partition_data(part_spec)
@@ -650,8 +651,9 @@ class WriteExtension(cliapp.Application):
         ''' Verify partition data and update offsets (sectors)
             and sizes (bytes) for each partition '''
 
-        total_size = 0
         partitions = partition_data['partitions']
+
+        total_size = 0
         for partition in partitions:
             size_bytes = self._parse_size(str(partition['size']))
             partition['size'] = size_bytes
@@ -660,27 +662,22 @@ class WriteExtension(cliapp.Application):
         # Compare with DISK_SIZE
         self.status(msg='Requested image size: %s bytes' % total_size)
         size = self.get_disk_size()
-        unused_space = size - total_size
         if not size:
             raise cliapp.AppException('DISK_SIZE is not defined')
         if total_size > size:
-            raise cliapp.AppException(
-                'Requested total size exceeds disk image size')
+            raise cliapp.AppException('Requested total size'
+                                      'exceeds disk image size')
 
-        offset = partition_data['start_offset']
-        used_numbers = set()
         part_num = 1
+        used_numbers = set()
+        offset = int(partition_data['start_offset'])
         for partition in partitions:
-            # Allow partition numbering to be overriden
             if 'number' in partition.keys():
-                part_num = partition['number']
-            if 'fill' in partition.keys():
-                if self.get_boolean(partition['fill']):
-                    partition['size'] += (unused_space-1024) # TODO prevent multiple fills, fix
+                part_num = int(partition['number'])
 
-            size_bytes = partition['size']
+            size_bytes = int(partition['size'])
             size_sectors = (size_bytes / 512 +
-                          ((size_bytes % 512) != 0) * 1)
+                           ((size_bytes % 512) != 0) * 1)
             partition['size_sectors'] = size_sectors
             partition['start'] = offset
             partition['end'] = offset + size_sectors
@@ -693,22 +690,24 @@ class WriteExtension(cliapp.Application):
 
             partition['number'] = part_num
             used_numbers.add(part_num)
+
             # Get the next free partition number
             for n in xrange(1,5):
                 if n not in used_numbers:
                     part_num = n
                     break
-            # TODO handle too many partitions used
+                elif n == 4:
+                    raise cliapp.AppException('A maximum of four'
+                                              'partitions is supported.')
 
-            self.status(msg='Number:   ' + str(partition['number']))
-            self.status(msg='  Start:  ' + str(partition['start']))
-            self.status(msg='  End:    ' + str(partition['end']))
-            self.status(msg='  Ftype:  ' + str(partition['fdisk_type']))
-            self.status(msg='  Format: ' + str(partition['format']))
-            self.status(msg='  Size:   ' + str(partition['size']))
+            self.status(msg='Number:   %s' % str(partition['number']))
+            self.status(msg='  Start:  %s sectors' % str(partition['start']))
+            self.status(msg='  End:    %s sectors' % str(partition['end']))
+            self.status(msg='  Ftype:  %s' % str(partition['fdisk_type']))
+            self.status(msg='  Format: %s' % str(partition['format']))
+            self.status(msg='  Size:   %s bytes' % str(partition['size']))
 
-
-        # Re-order the dict for partition number
+        # Sort the partitions by number
         new_partitions = []
         for n in range(1,5):
             for partition in partition_data['partitions']:
@@ -716,5 +715,4 @@ class WriteExtension(cliapp.Application):
                     new_partitions.append(partition)
 
         partition_data['partitions'] = new_partitions
-
         return partition_data
