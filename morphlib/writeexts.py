@@ -648,8 +648,7 @@ class WriteExtension(cliapp.Application):
             raise
 
     def process_partition_data(self, partition_data):
-        ''' Verify partition data and update offsets, sizes
-            and numbering for each partition '''
+        ''' Calculate offsets, sizes, and numbering for each partition '''
 
         partitions = partition_data['partitions']
 
@@ -659,8 +658,8 @@ class WriteExtension(cliapp.Application):
             partition['size'] = size_bytes
             total_size += size_bytes
 
-        # Compare with DISK_SIZE
         self.status(msg='Requested image size: %s bytes' % total_size)
+
         size = self.get_disk_size()
         if not size:
             raise cliapp.AppException('DISK_SIZE is not defined')
@@ -672,11 +671,29 @@ class WriteExtension(cliapp.Application):
         used_numbers = set()
         offset = int(partition_data['start_offset'])
         for partition in partitions:
+            # Find the next unused partition number
+            for n in xrange(1,5):
+                if n not in used_numbers:
+                    part_num = n
+                    break
+                elif n == 4:
+                    raise cliapp.AppException('A maximum of four'
+                                              ' partitions is supported.')
+
             if 'number' in partition.keys():
-                if partition['number'] not in used_numbers:
-                    part_num = int(partition['number'])
+                part_num_req = int(partition['number'])
+                if part_num_req in range(1,5):
+                    if part_num_req not in used_numbers:
+                        part_num = part_num_req
+                    else:
+                        raise cliapp.AppException('Repeated partition number')
                 else:
-                    raise cliapp.AppException('Repeated partition number')
+                    raise cliapp.AppException('Requested partition number %s.'
+                                              ' A maximum of four partitions'
+                                              ' is supported.' % part_num_req)
+
+            partition['number'] = part_num
+            used_numbers.add(part_num)
 
             size_bytes = int(partition['size'])
             size_sectors = (size_bytes / 512 +
@@ -691,18 +708,6 @@ class WriteExtension(cliapp.Application):
             else:
                 partition['boot'] = False
 
-            partition['number'] = part_num
-            used_numbers.add(part_num)
-
-            # Get the next free partition number
-            for n in xrange(1,5):
-                if n not in used_numbers:
-                    part_num = n
-                    break
-                elif n == 4:
-                    raise cliapp.AppException('A maximum of four'
-                                              ' partitions is supported.')
-
             self.status(msg='Number:   %s' % str(partition['number']))
             self.status(msg='  Start:  %s sectors' % str(partition['start']))
             self.status(msg='  End:    %s sectors' % str(partition['end']))
@@ -710,7 +715,7 @@ class WriteExtension(cliapp.Application):
             self.status(msg='  Format: %s' % str(partition['format']))
             self.status(msg='  Size:   %s bytes' % str(partition['size']))
 
-        # Sort the partitions by number
+        # Sort the partitions by partition number
         new_partitions = []
         for n in range(1,5):
             for partition in partition_data['partitions']:
