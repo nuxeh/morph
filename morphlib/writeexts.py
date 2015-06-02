@@ -639,7 +639,7 @@ class WriteExtension(cliapp.Application):
         ''' Load partition data from a yaml specification '''
 
         try:
-            self.status(msg='Opening partition specification: %s' % part_file)
+            self.status(msg='Reading partition specification: %s' % part_file)
             with open(part_file, 'r') as f:
                 part_spec = yaml.load(f)
             return self.process_partition_data(part_spec)
@@ -648,8 +648,8 @@ class WriteExtension(cliapp.Application):
             raise
 
     def process_partition_data(self, partition_data):
-        ''' Verify partition data and update offsets (sectors)
-            and sizes (bytes) for each partition '''
+        ''' Verify partition data and update offsets, sizes
+            and numbering for each partition '''
 
         partitions = partition_data['partitions']
 
@@ -666,14 +666,17 @@ class WriteExtension(cliapp.Application):
             raise cliapp.AppException('DISK_SIZE is not defined')
         if total_size > size:
             raise cliapp.AppException('Requested total size'
-                                      'exceeds disk image size')
+                                      ' exceeds disk image size')
 
         part_num = 1
         used_numbers = set()
         offset = int(partition_data['start_offset'])
         for partition in partitions:
             if 'number' in partition.keys():
-                part_num = int(partition['number'])
+                if partition['number'] not in used_numbers:
+                    part_num = int(partition['number'])
+                else:
+                    raise cliapp.AppException('Repeated partition number')
 
             size_bytes = int(partition['size'])
             size_sectors = (size_bytes / 512 +
@@ -698,7 +701,7 @@ class WriteExtension(cliapp.Application):
                     break
                 elif n == 4:
                     raise cliapp.AppException('A maximum of four'
-                                              'partitions is supported.')
+                                              ' partitions is supported.')
 
             self.status(msg='Number:   %s' % str(partition['number']))
             self.status(msg='  Start:  %s sectors' % str(partition['start']))
