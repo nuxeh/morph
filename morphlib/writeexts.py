@@ -652,33 +652,18 @@ class WriteExtension(cliapp.Application):
 
         partitions = partition_data['partitions']
 
-        total_size = 0
-        for partition in partitions:
-            size_bytes = self._parse_size(str(partition['size']))
-            partition['size'] = size_bytes
-            total_size += size_bytes
-
-        self.status(msg='Requested image size: %s bytes' % total_size)
-
-        size = self.get_disk_size()
-        if not size:
-            raise cliapp.AppException('DISK_SIZE is not defined')
-        if total_size > size:
-            raise cliapp.AppException('Requested total size'
-                                      ' exceeds disk image size')
-
         requested_numbers = set()
         for partition in partitions:
             if 'number' in partition.keys():
                 requested_numbers.add(int(partition['number']))
                 
-        part_num = 1
+        total_size = 0
         used_numbers = set()
         offset = int(partition_data['start_offset'])
         for partition in partitions:
             # Find the next unused partition number
             for n in xrange(1,5):
-                if n not in used_numbers and n not in requested_numbers :
+                if n not in used_numbers and n not in requested_numbers:
                     part_num = n
                     break
                 elif n == 4:
@@ -700,7 +685,10 @@ class WriteExtension(cliapp.Application):
             partition['number'] = part_num
             used_numbers.add(part_num)
 
-            size_bytes = int(partition['size'])
+            size_bytes = self._parse_size(str(partition['size']))
+            partition['size'] = size_bytes
+            total_size += size_bytes
+
             size_sectors = (size_bytes / 512 +
                            ((size_bytes % 512) != 0) * 1)
             partition['size_sectors'] = size_sectors
@@ -719,6 +707,15 @@ class WriteExtension(cliapp.Application):
             self.status(msg='  Ftype:  %s' % str(partition['fdisk_type']))
             self.status(msg='  Format: %s' % str(partition['format']))
             self.status(msg='  Size:   %s bytes' % str(partition['size']))
+
+        self.status(msg='Requested image size: %s bytes' % total_size)
+
+        size = self.get_disk_size()
+        if not size:
+            raise cliapp.AppException('DISK_SIZE is not defined')
+        if total_size > size:
+            raise cliapp.AppException('Requested total size'
+                                      ' exceeds disk image size')
 
         # Sort the partitions by partition number
         new_partitions = []
