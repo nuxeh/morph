@@ -24,6 +24,7 @@ import tempfile
 import errno
 import stat
 import contextlib
+import yaml
 
 import morphlib
 
@@ -593,14 +594,25 @@ class WriteExtension(cliapp.Application):
     def get_environment_boolean(self, variable):
         '''Parse a yes/no boolean passed through the environment.'''
 
-        value = os.environ.get(variable, 'no').lower()
+        value = os.environ.get(variable, 'no')
+        try:
+            return self.get_boolean(value)
+        except BaseException:
+            self.status(msg='Unexpected value for %s: %s' %
+                       (variable, value))
+            raise
+
+    def get_boolean(self, value):
+        '''Parse a yes/no boolean from a string.'''
+
+        value = str(value).lower()
         if value in ['no', '0', 'false']:
             return False
         elif value in ['yes', '1', 'true']:
             return True
         else:
-            raise cliapp.AppException('Unexpected value for %s: %s' %
-                                      (variable, value))
+            raise cliapp.AppException('Unexpected value %s' %
+                                       value)
 
     def check_ssh_connectivity(self, ssh_host):
         try:
@@ -622,3 +634,95 @@ class WriteExtension(cliapp.Application):
             if e.errno == errno.ENOENT:
                 return False
             raise
+
+    def load_partition_data(self, part_file):
+        ''' Load partition data from a yaml specification '''
+
+        try:
+            self.status(msg='Reading partition specification: %s' % part_file)
+            with open(part_file, 'r') as f:
+                part_spec = yaml.load(f)
+            return self.process_partition_data(part_spec)
+        except BaseException:
+            self.status(msg='Unable to load partition specification')
+            raise
+
+    def process_partition_data(self, partition_data):
+        ''' Calculate offsets, sizes, and numbering for each partition '''
+
+        partitions = partition_data['partitions']
+
+        requested_numbers = set()
+        for partition in partitions:
+            if 'number' in partition.keys():
+                requested_numbers.add(int(partition['number']))
+
+        total_size = 0
+        used_numbers = set()
+        offset = int(partition_data['start_offset'])
+        for partition in partitions:
+            # Find the next unused partition number
+            for n in xrange(1,5):
+                if n not in used_numbers and n not in requested_numbers:
+                    part_num = n
+                    break
+                elif n == 4:
+                    raise cliapp.AppException('A maximum of four'
+                                              ' partitions is supported.')
+
+            if 'number' in partition.keys():
+                part_num_req = int(partition['number'])
+                if part_num_req in range(1,5):
+                    if part_num_req not in used_numbers:
+                        part_num = part_num_req
+                    else:
+                        raise cliapp.AppException('Repeated partition number')
+                else:
+                    raise cliapp.AppException('Requested partition number %s.'
+                                              ' A maximum of four partitions'
+                                              ' is supported.' % part_num_req)
+
+            partition['number'] = part_num
+            used_numbers.add(part_num)
+
+            size_bytes = self._parse_size(str(partition['size']))
+            partition['size'] = size_bytes
+            total_size += size_bytes
+
+            size_sectors = (size_bytes / 512 +
+                           ((size_bytes % 512) != 0) * 1)
+            partition['size_sectors'] = size_sectors
+            partition['start'] = offset
+            partition['end'] = offset + size_sectors
+            offset += size_sectors + 1
+
+            if 'boot' in partition.keys():
+                partition['boot'] = self.get_boolean(partition['boot'])
+            else:
+                partition['boot'] = False
+
+            self.status(msg='Number:   %s' % str(partition['number']))
+            self.status(msg='  Start:  %s sectors' % str(partition['start']))
+            self.status(msg='  End:    %s sectors' % str(partition['end']))
+            self.status(msg='  Ftype:  %s' % str(partition['fdisk_type']))
+            self.status(msg='  Format: %s' % str(partition['format']))
+            self.status(msg='  Size:   %s bytes' % str(partition['size']))
+
+        self.status(msg='Requested image size: %s bytes' % total_size)
+
+        size = self.get_disk_size()
+        if not size:
+            raise cliapp.AppException('DISK_SIZE is not defined')
+        if total_size > size:
+            raise cliapp.AppException('Requested total size'
+                                      ' exceeds disk image size')
+
+        # Sort the partitions by partition number
+        new_partitions = []
+        for n in range(1,5):
+            for partition in partition_data['partitions']:
+                if partition['number'] == n:
+                    new_partitions.append(partition)
+
+        partition_data['partitions'] = new_partitions
+        return partition_data
