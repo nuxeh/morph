@@ -656,7 +656,7 @@ class WriteExtension(cliapp.Application):
         for partition in partitions:
             if 'number' in partition.keys():
                 requested_numbers.add(int(partition['number']))
-                
+
         total_size = 0
         used_numbers = set()
         offset = int(partition_data['start_offset'])
@@ -668,7 +668,7 @@ class WriteExtension(cliapp.Application):
                     break
                 elif n == 4:
                     raise cliapp.AppException('A maximum of four'
-                                              ' partitions is supported.')                    
+                                              ' partitions is supported.')
 
             if 'number' in partition.keys():
                 part_num_req = int(partition['number'])
