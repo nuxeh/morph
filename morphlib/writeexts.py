@@ -667,18 +667,23 @@ class WriteExtension(cliapp.Application):
             raise cliapp.AppException('Requested total size'
                                       ' exceeds disk image size')
 
+        requested_numbers = set()
+        for partition in partitions:
+            if 'number' in partition.keys():
+                requested_numbers.add(int(partition['number']))
+                
         part_num = 1
         used_numbers = set()
         offset = int(partition_data['start_offset'])
         for partition in partitions:
             # Find the next unused partition number
             for n in xrange(1,5):
-                if n not in used_numbers:
+                if n not in used_numbers and n not in requested_numbers :
                     part_num = n
                     break
                 elif n == 4:
                     raise cliapp.AppException('A maximum of four'
-                                              ' partitions is supported.')
+                                              ' partitions is supported.')                    
 
             if 'number' in partition.keys():
                 part_num_req = int(partition['number'])
