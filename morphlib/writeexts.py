@@ -25,6 +25,7 @@ import errno
 import stat
 import contextlib
 import yaml
+import subprocess
 
 import morphlib
 
@@ -635,6 +636,22 @@ class WriteExtension(cliapp.Application):
                 return False
             raise
 
+    def do_partitioning(self, location, temp_root, partition_data):
+        ''' The steps required to create a partitioned device or
+            device image
+
+            This includes:
+            - Creating a partition table
+            - Creating filesystems on partitions
+            - Copying files to partitions
+            - Directly writing files to the device
+            - Creating the Baserock system on a partition
+
+            These functions only do anything if configured to do so in
+            a partition specification file, see exts/rawdisk.write.help '''
+
+        self.create_partition_table(location, partition_data)
+
     def load_partition_data(self, part_file):
         ''' Load partition data from a yaml specification '''
 
@@ -726,3 +743,48 @@ class WriteExtension(cliapp.Application):
 
         partition_data['partitions'] = new_partitions
         return partition_data
+
+    def create_partition_table(self, location, partition_data):
+        ''' Use fdisk to create a partition table '''
+
+        self.status(msg="Creating partition table on %s" % location)
+
+        p = subprocess.Popen(["fdisk", location],
+                             stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        # Create a new partition table
+        p.stdin.write("o\n")
+        for partition in partition_data['partitions']:
+            part_num = partition['number']
+            # Create partitions
+            if partition['fdisk_type'] != 'none':
+                cmd = ("n\n"
+                       "p\n"
+                       "" + str(part_num) + "\n"
+                       "" + str(partition['start']) + "\n"
+                       "" + str(partition['end']) + "\n")
+                p.stdin.write(cmd)
+
+                # Set partition types
+                cmd = "t\n"
+                if part_num > 1:
+                    # fdisk does not ask for a partition
+                    # number when setting the type of the
+                    # first created partition
+                    cmd += str(part_num) + "\n"
+                cmd += str(partition['fdisk_type']) + "\n"
+                p.stdin.write(cmd)
+
+                # Set bootable flag
+                if partition['boot']:
+                    cmd = "a\n"
+                    if part_num > 1:
+                        cmd += str(part_num) + "\n"
+                    p.stdin.write(cmd)
+
+        # Write changes
+        cmd = ("w\n"
+               "q\n")
+        p.stdin.write(cmd)
+        p.wait()

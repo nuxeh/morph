@@ -48,6 +48,16 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
             try:
                 if part_file is not None:
                     partition_data = self.load_partition_data(part_file)
+                    if not self.is_device(location):
+                        with self.created_disk_image(location):
+                            self.do_partitioning(location, temp_root,
+                                                 partition_data)
+                        self.status(msg='Disk image has been created at %s' %
+                                         location)
+                    else:
+                        self.do_partitioning(location, temp_root,
+                                             partition_data)
+                        self.status(msg='System deployed to %s' % location)
                 else:
                     if not self.is_device(location):
                         with self.created_disk_image(location):
