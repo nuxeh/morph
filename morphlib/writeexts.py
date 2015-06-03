@@ -803,3 +803,36 @@ class WriteExtension(cliapp.Application):
         p.stdin.write(cmd)
         p.wait()
 
+    def create_partition_filesystems(self, location, partition_data):
+        ''' Create all required filesystems on a partitioned device/image '''
+
+        self.status(msg="Creating filesystems")
+        partitions = partition_data['partitions']
+
+        for partition in partitions:
+            filesystem = partition['format']
+            if filesystem != 'none':
+                if self.is_device(location):
+                    device = location + partition['number']
+                    self.create_filesystem(device, filesystem)
+                else:
+                    with self.create_loopback(
+                    location, partition['start'] * 512, partition['size']) as device: # TODO line length
+                        self.create_filesystem(device, filesystem)
+
+    def create_filesystem(self, block_device, fstype):
+        recognised_filesystem_formats = ['btrfs', 'ext4', 'vfat']
+
+        if fstype == 'btrfs' and False:
+            self.format_btrfs(block_device)
+        elif fstype in recognised_filesystem_formats:
+            try:
+                self.status(msg='Creating %s filesystem' % fstype)
+                cliapp.runcmd(['mkfs.' + fstype, block_device])
+            except BaseException: # TODO cliapp.AppException?
+                raise cliapp.AppException(
+                    'Error creating %s filesystem on %s'
+                        % (fstype, block_device))
+        else:
+            raise cliapp.AppException(
+                'Unrecognised filesystem format: %s' % fstype)
