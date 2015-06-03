@@ -842,3 +842,36 @@ class WriteExtension(cliapp.Application):
         else:
             raise cliapp.AppException('Unrecognised filesystem'
                                       ' format: %s' % fstype)
+
+    def copy_partition_files(self, location, temp_root, partition_data):
+        ''' Copy files specified in the partition specification
+            to partitions '''
+
+        self.status(msg='Copying files to partitions')
+        partitions = partition_data['partitions']
+
+        for partition in partitions:
+            if not partition['format'] == 'none' \
+                  and 'files' in partition.keys():
+                offset = partition['start'] * 512
+                with self.mount(location, offset) as mp:
+                    files = partition['files']
+                    for file in files:
+                        source = os.path.join(temp_root, file['file']) # leading / TODO
+                        if os.path.exists(source):
+                            self.status(msg='copying %s' % source)
+                            dest_dir = ''
+                            if 'dest_dir' in file.keys():
+                                dest_dir = re.sub('^/', '', file['dest_dir'])
+                            target = os.path.join(mp, dest_dir)
+                            try:
+                                if not os.path.exists(target):
+                                    os.makedirs(target)
+                                shutil.copy(source, target)
+                            except:
+                                raise cliapp.AppException(
+                                                      'Error copying files')
+                        else:
+                            raise cliapp.AppException("File not found: %s"
+                                                          % source)
+                    cliapp.runcmd('sync')
