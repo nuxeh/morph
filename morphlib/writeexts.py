@@ -292,6 +292,35 @@ class WriteExtension(cliapp.Application):
             cliapp.runcmd(['umount', mount_point])
             os.rmdir(mount_point)
 
+    @contextlib.contextmanager
+    def create_loopback(self, location, offset=0, size=0):
+        ''' Create a loopback device for an image, or a partition in
+            an image
+              * offset - offset of the start of a partition in bytes
+              * size - limits the size of the partition, in bytes '''
+
+        self.status(msg='Creating loopback')
+        try:
+            if not self.is_device(location):
+                if size and offset:
+                    cmd = ['losetup', '--show', '-f', '-o', str(offset),
+                           '--sizelimit', str(size), location]
+                else:
+                    cmd = ['losetup', '--show', '-f', '-o', str(offset),
+                           location]
+                device = cliapp.runcmd(cmd).rstrip()
+            else:
+                raise cliapp.AppException('Can only create loop'
+                                          ' device for a file')
+        except cliapp.AppException:
+            sys.stderr.write('Error creating loopback')
+            raise
+        try:
+            yield device
+        finally:
+            self.status(msg='Detaching loopback')
+            cliapp.runcmd(['losetup', '-d', device])
+
     def create_btrfs_system_layout(self, temp_root, mountpoint, version_label,
                                    disk_uuid):
         '''Separate base OS versions from state using subvolumes.
