@@ -848,16 +848,13 @@ class WriteExtension(cliapp.Application):
             to partitions '''
 
         self.status(msg='Copying files to partitions')
-        partitions = partition_data['partitions']
 
-        for partition in partitions:
-            if not partition['format'] == 'none' \
-                  and 'files' in partition.keys():
-                offset = partition['start'] * 512
-                with self.mount(location, offset) as mp:
-                    files = partition['files']
-                    for file in files:
-                        source = os.path.join(temp_root, file['file']) # leading / TODO
+        for partition in partition_data['partitions']:
+            if 'files' in partition.keys() and \
+                    partition['format'] not in ['none', 'None', None]:
+                with self.mount(location, partition['start'] * 512) as mp:
+                    for file in partition['files']:
+                        source = os.path.join(temp_root, file['file'])
                         if os.path.exists(source):
                             self.status(msg='copying %s' % source)
                             dest_dir = ''
