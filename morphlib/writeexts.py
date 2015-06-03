@@ -291,6 +291,41 @@ class WriteExtension(cliapp.Application):
             cliapp.runcmd(['umount', mount_point])
             os.rmdir(mount_point)
 
+    @contextlib.contextmanager
+    def create_loopback(self, location, offset=0, size=0):
+        ''' Create a loopback device for accessing block devices
+
+            This may be an image, or a real block device, or a partition in
+            either of these, for access as a raw device without filesystem,
+            or for subsequent mounting.
+
+              * offset - offset of the start of a partition in bytes
+              * size - limits the size of the partition, in bytes '''
+
+        self.status(msg='Creating loopback')
+        try:
+            if size and offset:
+                cmd = ['losetup', '--show', '-f', '-P', '-o', str(offset),
+                       '--sizelimit', str(size), location]
+            else:
+                cmd = ['losetup', '--show', '-f', '-P', '-o', str(offset),
+                        location]
+            device = cliapp.runcmd(cmd).rstrip()
+            # Allow the system time to see the new device
+            # Without this, mounts created on the loopdev
+            # too soon after creating the loopback device
+            # are unreliable, even though
+            # the -P (--partscan) option is passed to losetup
+            time.sleep(1)
+        except cliapp.AppException:
+            sys.stderr.write('Error creating loopback')
+            raise
+        try:
+            yield device
+        finally:
+            self.status(msg='Detaching loopback')
+            cliapp.runcmd(['losetup', '-d', device])
+
     def create_btrfs_system_layout(self, temp_root, mountpoint, version_label,
                                    disk_uuid):
         '''Separate base OS versions from state using subvolumes.
