@@ -804,7 +804,8 @@ class WriteExtension(cliapp.Application):
         p.wait()
 
     def create_partition_filesystems(self, location, partition_data):
-        ''' Create all required filesystems on a partitioned device/image '''
+        ''' Read partition data and create all required
+            filesystems on a partitioned device/image '''
 
         partitions = partition_data['partitions']
         self.status(msg="Creating filesystems")
@@ -822,6 +823,8 @@ class WriteExtension(cliapp.Application):
                         self.create_filesystem(device, filesystem)
 
     def create_filesystem(self, block_device, fstype):
+        ''' Create filesystems of various types on a device node '''
+
         recognised_filesystem_formats = ['btrfs', 'ext4', 'vfat']
 
         if fstype == 'btrfs':
