@@ -694,6 +694,7 @@ class WriteExtension(cliapp.Application):
             partition specification, see extensions/rawdisk.write.help '''
 
         self.create_partition_table(location, partition_data)
+        self.create_partition_filesystems(location, partition_data)
 
     def load_partition_data(self, part_file):
         ''' Load partition data from a yaml specification '''
@@ -829,3 +830,42 @@ class WriteExtension(cliapp.Application):
         cmd += ("w\n"
                "q\n")
         cliapp.runcmd(['fdisk', location], feed_stdin=cmd)
+
+    def create_partition_filesystems(self, location, partition_data):
+        ''' Read partition data and create all required
+            filesystems on a partitioned device/image '''
+
+        partitions = partition_data['partitions']
+        self.status(msg="Creating filesystems")
+
+        for partition in partitions:
+            filesystem = partition['format']
+            if filesystem not in ['none', 'None', None]:
+                if self.is_device(location):
+                    device = self.get_part_devname(location,
+                                                   partition['number'])
+                    self.create_filesystem(device, filesystem)
+                else:
+                    with self.create_loopback(location,
+                                              partition['start'] * 512,
+                                              partition['size']) as device:
+                        self.create_filesystem(device, filesystem)
+
+    def create_filesystem(self, block_device, fstype):
+        ''' Create filesystems of various types on a device node '''
+
+        recognised_filesystem_formats = ['btrfs', 'ext4', 'vfat']
+
+        if fstype == 'btrfs':
+            self.format_btrfs(block_device)
+        elif fstype in recognised_filesystem_formats:
+            try:
+                self.status(msg='Creating %s filesystem' % fstype)
+                cliapp.runcmd(['mkfs.' + fstype, block_device])
+            except BaseException:
+                raise cliapp.AppException(
+                        'Error creating %s filesystem on %s'
+                        % (fstype, block_device))
+        else:
+            raise cliapp.AppException('Unrecognised filesystem'
+                                      ' format: %s' % fstype)
