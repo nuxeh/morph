@@ -857,3 +857,39 @@ class WriteExtension(cliapp.Application):
         else:
             raise cliapp.AppException('Unrecognised filesystem'
                                       ' format: %s' % fstype)
+
+    def copy_partition_files(self, location, temp_root, partition_data):
+        ''' Copy files specified in the partition specification
+            from the unpacked rootfs to partitions '''
+
+        for partition in partition_data['partitions']:
+            if 'files' in partition.keys():
+                if partition['format'] not in ['none', 'None', None]:
+                    self.status(msg='Copying files to partition %s'
+                                    % partition['number'])
+                    if self.is_device(location):
+                        location = self.get_part_devname(location,
+                                                         partition['number'])
+                    with self.mount(location, partition['start'] * 512) as mp:
+                        for file in partition['files']:
+                            source = os.path.join(temp_root, file['file'])
+                            if os.path.exists(source):
+                                self.status(msg='Copying %s' % source)
+                                dest_dir = ''
+                                if 'dest_dir' in file.keys():
+                                    dest_dir = re.sub('^/', '', file['dest_dir'])
+                                target = os.path.join(mp, dest_dir)
+                                try:
+                                    if not os.path.exists(target):
+                                        os.makedirs(target)
+                                    shutil.copy(source, target)
+                                except:
+                                    raise cliapp.AppException(
+                                                          'Error copying files')
+                            else:
+                                raise cliapp.AppException('File not found: %s'
+                                                              % source)
+                        cliapp.runcmd('sync')
+                else:
+                    raise cliapp.AppException('Cannot copy files to'
+                                              ' an unformatted partition')
