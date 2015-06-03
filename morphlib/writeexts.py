@@ -273,14 +273,16 @@ class WriteExtension(cliapp.Application):
                               location]).strip()
 
     @contextlib.contextmanager
-    def mount(self, location):
+    def mount(self, location, offset=0):
+        ''' Mount a device or image containing a filesystem '''
         self.status(msg='Mounting filesystem')
         try:
             mount_point = tempfile.mkdtemp()
             if self.is_device(location):
                 cliapp.runcmd(['mount', location, mount_point])
             else:
-                cliapp.runcmd(['mount', '-o', 'loop', location, mount_point])
+                cliapp.runcmd(['mount', '-o', 'loop,offset=' + str(offset),
+                              location, mount_point])
         except BaseException as e:
             sys.stderr.write('Error mounting filesystem')
             os.rmdir(mount_point)
