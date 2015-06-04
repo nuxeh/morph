@@ -320,7 +320,7 @@ class WriteExtension(cliapp.Application):
         try:
             yield device
         finally:
-            self.status(msg='Detatching loopback: %s' % device)
+            self.status(msg='Detaching loopback')
             cliapp.runcmd(['losetup', '-d', device])
 
     def create_btrfs_system_layout(self, temp_root, mountpoint, version_label,
