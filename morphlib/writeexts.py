@@ -886,9 +886,12 @@ class WriteExtension(cliapp.Application):
 
         for partition in partition_data['partitions']:
             if 'raw_files' in partition.keys():
-                self.partition_dd(temp_root, location, partition['raw_files'], partition['start'] * 512)
+                self.partition_dd(temp_root, location,
+                                  partition['raw_files'],
+                                  partition['start'] * 512)
         if 'raw_files' in partition_data.keys():
-            self.partition_dd(temp_root, location, partition_data['raw_files'], 0)
+            self.partition_dd(temp_root, location,
+                              partition_data['raw_files'], 0)
 
     def partition_dd(self, temp_root, location, raw_files_data, start_offset):
         ''' `dd` files consecutively to an offset on a device
@@ -905,19 +908,21 @@ class WriteExtension(cliapp.Application):
             if 'offset_bytes' in raw_file.keys():
                 file_offset = raw_file['offset_bytes']
             source = os.path.join(temp_root, raw_file['file'])
-            if os.path.exists(source):
-                if not os.path.isdir(source):
-                    self.dd(location, source, file_offset)
-                    file_offset += os.stat(source).st_size
-                else:
-                    raise cliapp.AppException('Can only dd regular files, not directories')
-            else:
-                raise cliapp.AppException('File not found: %s' % source)
+            self.dd(location, source, file_offset)
+            file_offset += os.stat(source).st_size
 
     def dd(self, location, filename, offset):
         ''' `dd` filename to a device, offset in bytes '''
 
-        self.status(msg='Writing %s, at offset %d bytes' % (filename, offset))
-        cliapp.runcmd(['dd', 'if=%s' % filename, 'of=%s' % location,
-                       'bs=1', 'seek=%s' % offset, 'conv=notrunc'])
-        cliapp.runcmd('sync')
+        if os.path.exists(filename):
+            if not os.path.isdir(filename):
+                self.status(msg='Writing %s, at offset %d bytes' %
+                           (filename, offset))
+                cliapp.runcmd(['dd', 'if=%s' % filename, 'of=%s' % location,
+                               'bs=1', 'seek=%s' % offset, 'conv=notrunc'])
+                cliapp.runcmd('sync')
+            else:
+                raise cliapp.AppException('Can only dd regular files,'
+                                          ' not directories')
+        else:
+            raise cliapp.AppException('File not found: %s' % filename)
