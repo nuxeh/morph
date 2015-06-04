@@ -24,6 +24,11 @@ import tempfile
 import errno
 import stat
 import contextlib
+try:
+    # TODO: try importing from contextlib first
+    from contexter import ExitStack
+except ImportError:
+    pass
 import yaml
 
 import morphlib
@@ -760,6 +765,8 @@ class WriteExtension(cliapp.Application):
         self.create_partition_filesystems(location, partitions, sector_size)
         self.partition_direct_copy(location, temp_root,
                                    partition_data, sector_size)
+        self.create_partition_rootfs(temp_root, location,
+                                     partitions, sector_size)
 
     def load_partition_data(self, part_file):
         ''' Load partition data from a yaml specification '''
@@ -1076,3 +1083,38 @@ class WriteExtension(cliapp.Application):
                                               'not directories')
             else:
                 raise cliapp.AppException('File not found: %s' % source)
+
+    def create_partition_rootfs(self, temp_root, location,
+                                partitions, sector_size):
+        ''' Create the Baserock root filesystem, and set up partitions
+
+            Create a Baserock system on '/'. Additionally add entries for
+            partitions to the system's /etc/fstab, copy files from the
+            mountpoint in the rootfs to the appropriate partition, or
+            create an empty mountpoint for it '''
+
+        self.status(msg='Creating system...')
+
+        with ExitStack() as stack:
+            mountpoints = {partition['mountpoint']:
+                                {'format': partition['format'],
+                                 'uuid': self.get_uuid(location,
+                                                       partition['start'] *
+                                                       sector_size),
+                'mount_dir': stack.enter_context(self.mount(
+                             stack.enter_context(
+                                  self.create_loopback(location,
+                                                       partition['start'] *
+                                                       sector_size,
+                                                       partition['size']))))}
+                           for partition in partitions
+                           if 'mountpoint' in partition}
+
+            root_mount = mountpoints['/']
+            self.create_btrfs_system_layout(temp_root,
+                                            root_mount['mount_dir'],
+                                            'factory', root_mount['uuid'],
+                                            mountpoints)
+
+
+# TODO: Test with python 3, split files - contexter.py in *morph*
