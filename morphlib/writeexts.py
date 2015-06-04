@@ -700,6 +700,8 @@ class WriteExtension(cliapp.Application):
         self.create_partition_filesystems(location, partitions, sector_size)
         self.copy_partition_files(location, temp_root,
                                   partitions, sector_size)
+        self.partition_direct_copy(location, temp_root,
+                                   partition_data, sector_size)
 
     def load_partition_data(self, part_file):
         ''' Load partition data from a yaml specification '''
@@ -895,3 +897,54 @@ class WriteExtension(cliapp.Application):
                 else:
                     raise cliapp.AppException('Cannot copy files to'
                                               ' an unformatted partition')
+
+    def partition_direct_copy(self, location, temp_root,
+                              partition_data, sector_size):
+        ''' Copy files directly to a partition using `dd`
+
+            Where raw files are specified within a partition, the offset
+            is taken from the start of the partition, but if specified at
+            the top level of the configuration file, the offset is taken
+            from the start of the disc '''
+
+        self.status(msg='Writing files directly to image')
+
+        for partition in partition_data['partitions']:
+            if 'raw_files' in partition:
+                self.partition_dd(temp_root, location,
+                                  partition['raw_files'],
+                                  partition['start'] *
+                                  sector_size, sector_size)
+        if 'raw_files' in partition_data:
+            self.partition_dd(temp_root, location,
+                              partition_data['raw_files'], 0, sector_size)
+
+    def partition_dd(self, temp_root, location, raw_files_data,
+                     start_offset, sector_size):
+        ''' `dd` files consecutively to an offset on a device
+
+            By default files are written after the previous file in the
+            specification, optionally any file can have a an offset set
+            in bytes or sectors '''
+
+        file_offset = start_offset
+        for raw_file in raw_files_data:
+            if 'offset' in raw_file:
+                file_offset = raw_file['offset'] * sector_size
+            if 'offset_bytes' in raw_file:
+                file_offset = raw_file['offset_bytes']
+            source = os.path.join(temp_root, raw_file['file'])
+            if os.path.exists(source):
+                if not os.path.isdir(source):
+                    self.status(msg='Writing %s, at offset %d bytes' %
+                                     (source, file_offset))
+                    cliapp.runcmd(['dd', 'if=%s' % source, 'of=%s' % location,
+                                   'bs=1', 'seek=%s' % file_offset,
+                                   'conv=notrunc'])
+                    cliapp.runcmd('sync')
+                    file_offset += os.stat(source).st_size
+                else:
+                    raise cliapp.AppException('Can only dd regular files, '
+                                              'not directories')
+            else:
+                raise cliapp.AppException('File not found: %s' % source)
