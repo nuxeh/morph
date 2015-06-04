@@ -929,12 +929,20 @@ class WriteExtension(cliapp.Application):
             raise cliapp.AppException('File not found: %s' % filename)
 
     def create_partition_rootfs(self, temp_root, location, partition_data):
-        partitions = partition_data['partitions']
-        for partition in partitions:
+        ''' Create root filesystem for the partition flagged to be the rootfs
+
+            This is a partition which contains a 'type: rootfs' element in
+            the partition specification. This will only be done once, for the
+            first partition encountered, even if multiple partitions are flagged '''
+
+        for partition in partition_data['partitions']:
             if 'type' in partition.keys():
                 if partition['type'] == 'rootfs':
-                    self.status(msg='Creating rootfs on partition ' + str(partition['number']))
+                    self.status(msg='Creating rootfs on partition %d'
+                                     % partition['number'])
                     if self.is_device(location):
-                        self.create_system(temp_root, 'location' + str(partition['number']))
+                        self.create_system(temp_root, 'location' + str(partition['number'])) # TODO
                     else:
-                        self.create_system(temp_root, location, partition['start'] * 512)
+                        self.create_system(temp_root, location,
+                                           partition['start'] * 512)
+                    break
