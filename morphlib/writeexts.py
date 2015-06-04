@@ -884,6 +884,8 @@ class WriteExtension(cliapp.Application):
             the top level of the configuration file, the offset is taken
             from the start of the disc '''
 
+        self.status(msg='Writing files directly to image')
+
         for partition in partition_data['partitions']:
             if 'raw_files' in partition.keys():
                 self.partition_dd(temp_root, location,
@@ -900,7 +902,6 @@ class WriteExtension(cliapp.Application):
             specification, optionally any file can have a an offset set
             in bytes or sectors '''
 
-        self.status(msg='Writing files directly to image')
         file_offset = start_offset
         for raw_file in raw_files_data:
             if 'offset' in raw_file.keys():
