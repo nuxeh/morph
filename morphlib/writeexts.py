@@ -172,8 +172,8 @@ class WriteExtension(cliapp.Application):
             sys.stderr.write('Error creating disk image')
             raise
 
-    def create_system(self, temp_root, raw_disk):
-        with self.mount(raw_disk) as mp:
+    def create_system(self, temp_root, raw_disk, offset=0):
+        with self.mount(raw_disk, offset) as mp:
             try:
                 self.create_btrfs_system_layout(
                     temp_root, mp, version_label='factory',
