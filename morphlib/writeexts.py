@@ -177,7 +177,7 @@ class WriteExtension(cliapp.Application):
             try:
                 self.create_btrfs_system_layout(
                     temp_root, mp, version_label='factory',
-                    disk_uuid=self.get_uuid(raw_disk))
+                    disk_uuid=self.get_uuid(raw_disk, offset))
             except BaseException as e:
                 sys.stderr.write('Error creating Btrfs system layout')
                 raise
@@ -264,12 +264,12 @@ class WriteExtension(cliapp.Application):
             else:
                 raise
 
-    def get_uuid(self, location):
+    def get_uuid(self, location, offset=0):
         '''Get the UUID of a block device's file system.'''
         # Requires util-linux blkid; busybox one ignores options and
         # lies by exiting successfully.
         return cliapp.runcmd(['blkid', '-s', 'UUID', '-o', 'value',
-                              location]).strip()
+                              '-p', '-O', str(offset), location]).strip()
 
     @contextlib.contextmanager
     def mount(self, location, offset=0):
