@@ -700,6 +700,8 @@ class WriteExtension(cliapp.Application):
         self.create_partition_filesystems(location, partitions, sector_size)
         self.partition_direct_copy(location, temp_root,
                                    partition_data, sector_size)
+        self.create_partition_rootfs(temp_root, location,
+                                     partitions, sector_size)
 
     def load_partition_data(self, part_file):
         ''' Load partition data from a yaml specification '''
@@ -946,3 +948,24 @@ class WriteExtension(cliapp.Application):
                                               'not directories')
             else:
                 raise cliapp.AppException('File not found: %s' % source)
+
+    def create_partition_rootfs(self, temp_root, location,
+                                partitions, sector_size):
+        ''' Create root filesystem for the partition flagged to be the rootfs
+
+            This is a partition which contains a 'type: rootfs' element in
+            the partition specification. This will only be done once, for the
+            first partition encountered, even if multiple partitions are
+            flagged '''
+
+        for partition in partitions:
+            if 'type' in partition:
+                if partition['type'] == 'rootfs':
+                    self.status(msg='Creating rootfs on partition %d'
+                                     % partition['number'])
+                    with self.create_loopback(location,
+                                              partition['start'] *
+                                              sector_size,
+                                              partition['size']) as loopdev:
+                        self.create_system(temp_root, loopdev)
+                    break
