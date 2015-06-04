@@ -847,11 +847,11 @@ class WriteExtension(cliapp.Application):
         ''' Copy files specified in the partition specification
             from the unpacked rootfs to partitions '''
 
-        self.status(msg='Copying files to partitions')
-
         for partition in partition_data['partitions']:
             if 'files' in partition.keys():
                 if partition['format'] not in ['none', 'None', None]:
+                    self.status(msg='Copying files to partition %s'
+                                    % partition['number'])
                     with self.mount(location, partition['start'] * 512) as mp:
                         for file in partition['files']:
                             source = os.path.join(temp_root, file['file'])
@@ -874,4 +874,4 @@ class WriteExtension(cliapp.Application):
                         cliapp.runcmd('sync')
                 else:
                     raise cliapp.AppException('Cannot copy files to'
-                                              ' an unformatted parition')
+                                              ' an unformatted partition')
