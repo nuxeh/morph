@@ -682,6 +682,26 @@ class WriteExtension(cliapp.Application):
         else:
             raise cliapp.AppException('Not a device!')
 
+    def do_partitioning(self, location, temp_root, partition_data):
+        ''' The steps required to create a partitioned device or
+            device image
+
+            This includes:
+            - Creating a partition table
+            - Creating filesystems on partitions
+            - Copying files to partitions
+            - Directly writing files to the device
+            - Creating the Baserock system on a partition
+
+            These functions only do anything if configured to do so in
+            a partition specification file, see exts/rawdisk.write.help '''
+
+        self.create_partition_table(location, partition_data)
+        self.create_partition_filesystems(location, partition_data)
+        self.copy_partition_files(location, temp_root, partition_data)
+        self.partition_direct_copy(location, temp_root, partition_data)
+        self.create_partition_rootfs(temp_root, location, partition_data)
+
     def load_partition_data(self, part_file):
         ''' Load partition data from a yaml specification '''
 
