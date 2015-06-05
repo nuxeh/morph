@@ -682,6 +682,16 @@ class WriteExtension(cliapp.Application):
         else:
             raise cliapp.AppException('Not a device!')
 
+    def do_partitioning(self, location, temp_root, partition_data):
+        ''' All the steps required to create a partitioned device or
+            device image '''
+
+        self.create_partition_table(location, partition_data)
+        self.create_partition_filesystems(location, partition_data)
+        self.copy_partition_files(location, temp_root, partition_data)
+        self.partition_direct_copy(location, temp_root, partition_data)
+        self.create_partition_rootfs(temp_root, location, partition_data)
+
     def load_partition_data(self, part_file):
         ''' Load partition data from a yaml specification '''
 
