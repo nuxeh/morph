@@ -37,12 +37,17 @@ class RawDiskWriteExtension(morphlib.writeexts.WriteExtension):
         temp_root, location = args
         upgrade = self.get_environment_boolean('UPGRADE')
 
-        if upgrade:
+        part_file = os.environ.get('PARTITION_FILE', None)
+
+        if upgrade and partfile is not None:
+            cliapp.AppException(msg='Upgrades for partitioned devices'
+                                    ' are not currently supported')
+        elif upgrade:
             self.upgrade_local_system(location, temp_root)
         else:
             try:
-                part_file = os.environ.get('PARTITION_FILE', None)
                 if part_file is not None:
+                    partition_data = self.load_partition_data(part_file)
                     if not self.is_device(location):
                         with self.created_disk_image(location):
                             partition_data = self.load_partition_data(part_file)
