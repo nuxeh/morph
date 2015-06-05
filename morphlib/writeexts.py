@@ -665,6 +665,21 @@ class WriteExtension(cliapp.Application):
                 return False
             raise
 
+    def get_part_devname(self, location, partition_number):
+        ''' Get the name of the device node
+            given to a partition on a block device '''
+
+        if self.is_device(location):
+            if re.match('.*[hs]d[a-p]', location):
+                return location + str(partition_number)
+            elif re.match('.*mmcblk\d+', location):
+                return location + 'p' + str(partition_number)
+            else:
+                self.status(msg='FIXME: Device name not implemented')
+                raise
+        else:
+            raise cliapp.AppException('Not a device!')
+
     def load_partition_data(self, part_file):
         ''' Load partition data from a yaml specification '''
 
