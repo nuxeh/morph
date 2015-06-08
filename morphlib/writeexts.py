@@ -593,14 +593,25 @@ class WriteExtension(cliapp.Application):
     def get_environment_boolean(self, variable):
         '''Parse a yes/no boolean passed through the environment.'''
 
-        value = os.environ.get(variable, 'no').lower()
+        value = os.environ.get(variable, 'no')
+        try:
+            return self.get_boolean(value)
+        except BaseException:
+            self.status(msg='Unexpected value for %s: %s' %
+                       (variable, value))
+            raise
+
+    def get_boolean(self, value):
+        '''Parse a yes/no boolean from a string.'''
+
+        value = str(value).lower()
         if value in ['no', '0', 'false']:
             return False
         elif value in ['yes', '1', 'true']:
             return True
         else:
-            raise cliapp.AppException('Unexpected value for %s: %s' %
-                                      (variable, value))
+            raise cliapp.AppException('Unexpected value %s' %
+                                       value)
 
     def check_ssh_connectivity(self, ssh_host):
         try:
