@@ -897,7 +897,7 @@ class WriteExtension(cliapp.Application):
                                 self.status(msg='Copying %s' % source)
                                 dest_dir = ''
                                 if 'dest_dir' in file.keys():
-                                    dest_dir = re.sub('^/', '', file['dest_dir'])
+                                    dest_dir = file['dest_dir']
                                 target = os.path.join(mp, dest_dir)
                                 try:
                                     if not os.path.exists(target):
@@ -905,7 +905,7 @@ class WriteExtension(cliapp.Application):
                                     shutil.copy(source, target)
                                 except:
                                     raise cliapp.AppException(
-                                                          'Error copying files')
+                                                        'Error copying files')
                             else:
                                 raise cliapp.AppException('File not found: %s'
                                                               % source)
