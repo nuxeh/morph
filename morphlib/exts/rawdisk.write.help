@@ -78,5 +78,51 @@ help: |
 
         (See https://www.kernel.org/doc/Documentation/kernel-parameters.txt)
 
+    * PARTITION_FILE=path: Setting this parameter enables partitioning
+      functions. The path points to a YAML file following the format below:
+
+        start_offset: 2048
+        partitions:
+        - description: boot
+          size: 1M
+          fdisk_type: a2
+          format: none
+          boot: yes
+          files:
+          - file: boot/zImage
+            dest_dir: boot
+        - description: rootfs
+          number: 3
+          size: 5G
+          format: vfat
+          fdisk_type: 0b
+          type: rootfs
+        raw_files:
+        - file: boot/uboot-env.img
+          offset_bytes: 512
+
+      - 'start_offset' is mandatory, specifying the start sector of the first
+        partition on the device.
+      - Following this, up to four partitions may be specified.
+      - For each partition, 'size', 'fdisk_type' and 'format' are mandatory.
+        'fdisk_type' is specified as a two-digit hexadecimal value, without a
+        '0x' prefix.
+      - 'number' is optional, but can be used to override the numbering of
+        partitions.
+      - 'boot' sets the partition's bootable flag.
+      - The partition to contain the root filesystem should be labeled with
+        'type: rootfs'.
+      - Where a list of 'files' is given, the specified files are copied from
+        the unpacked rootfs to the partition the list belongs to. 'dest_dir'
+        gives an optional target directory to copy a given file to.
+      - Where a list of 'raw_files' is given, these files are written directly
+        to the device using `dd`.
+        * Files are written consecutively in the order they are listed
+        * Files can be given a specific offset using 'offset' or 'offset_bytes'
+        * The 'raw_files' can exist at the top level of the partition file, or
+          within a partition list item. When specified inside a partition,
+          'offset' or 'offset_bytes' is counted from the start of that
+          partition, otherwise from the start of the device.
+
     (See `morph help deploy` for details of how to pass parameters to write
     extensions)
