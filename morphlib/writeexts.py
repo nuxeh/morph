@@ -971,7 +971,8 @@ class WriteExtension(cliapp.Application):
 
             This is a partition which contains a 'type: rootfs' element in
             the partition specification. This will only be done once, for the
-            first partition encountered, even if multiple partitions are flagged '''
+            first partition encountered, even if multiple partitions are
+            flagged '''
 
         for partition in partition_data['partitions']:
             if 'type' in partition.keys():
