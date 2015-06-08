@@ -836,7 +836,12 @@ class WriteExtension(cliapp.Application):
         # Write changes
         cmd = ("w\n"
                "q\n")
-        p.stdin.write(cmd)
+        out, err = p.communicate(cmd)
+        if 'Value out of range' in err:
+            raise cliapp.AppException(msg='fdisk error: \'Value out of'
+                                          ' range\': is the total requested'
+                                          ' size greater than the size of'
+                                          ' the device being deployed to?')
         p.wait()
 
     def create_partition_filesystems(self, location, partition_data):
