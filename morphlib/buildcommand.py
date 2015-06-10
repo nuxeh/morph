@@ -145,7 +145,8 @@ class BuildCommand(object):
         # Since the armv7 instruction set is nearly entirely armv5 compatible,
         # and since the incompatibilities are appropriately trapped in the
         # kernel, we can safely run any armv5 toolchain natively on armv7.
-        if host_arch in ('armv7l', 'armv7lhf') and root_arch in 'armv5l':
+        if host_arch in ('armv7l', 'armv7lhf') and root_arch in ('armv5l',
+                                                    'armv6l', 'armv6lhf'):
             return
 
         raise morphlib.Error(
