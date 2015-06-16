@@ -670,6 +670,8 @@ class WriteExtension(cliapp.Application):
         partition_data = self.process_partition_data(
                          partition_data_raw, sector_size)
 
+        self.create_partition_table(location, partition_data)
+
     def load_partition_data(self, part_file):
         ''' Load partition data from a yaml specification '''
 
@@ -756,3 +758,40 @@ class WriteExtension(cliapp.Application):
         new_partition_data = partition_data
         new_partition_data['partitions'] = new_partitions
         return new_partition_data
+
+    def create_partition_table(self, location, partition_data):
+        ''' Use fdisk to create a partition table '''
+
+        self.status(msg="Creating partition table on %s" % location)
+
+        # Create a new partition table
+        cmd = "o\n"
+        for partition in partition_data['partitions']:
+            part_num = partition['number']
+            # Create partitions
+            if partition['fdisk_type'] != 'none':
+                cmd += ("n\n"
+                        "p\n"
+                        "" + str(part_num) + "\n"
+                        "" + str(partition['start']) + "\n"
+                        "" + str(partition['end']) + "\n")
+
+                # Set partition types
+                cmd += "t\n"
+                if part_num > 1:
+                    # fdisk does not ask for a partition
+                    # number when setting the type of the
+                    # first created partition
+                    cmd += str(part_num) + "\n"
+                cmd += str(partition['fdisk_type']) + "\n"
+
+                # Set bootable flag
+                if partition['boot']:
+                    cmd += "a\n"
+                    if part_num > 1:
+                        cmd += str(part_num) + "\n"
+
+        # Write changes
+        cmd += ("w\n"
+               "q\n")
+        cliapp.runcmd(['fdisk', location], feed_stdin=cmd)
