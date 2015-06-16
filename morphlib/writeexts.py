@@ -24,6 +24,7 @@ import tempfile
 import errno
 import stat
 import contextlib
+import yaml
 
 import morphlib
 
@@ -647,3 +648,111 @@ class WriteExtension(cliapp.Application):
         else:
             raise cliapp.AppException('Can\'t get physical sector '
                                       'size for %s' % location)
+
+    def do_partitioning(self, location, temp_root, part_file):
+        ''' The steps required to create a partitioned device or
+            device image
+
+            This includes:
+            - Creating a partition table
+            - Creating filesystems on partitions
+            - Copying files to partitions
+            - Directly writing files to the device
+            - Creating the Baserock system on a partition
+
+            These functions only do anything if configured to do so in a
+            partition specification, see extensions/rawdisk.write.help '''
+
+        partition_data_raw = self.load_partition_data(part_file)
+        sector_size = self.get_sector_size(location)
+        self.status(msg='Using a physical sector size of %d bytes'
+                         % sector_size)
+        partition_data = self.process_partition_data(
+                         partition_data_raw, sector_size)
+
+    def load_partition_data(self, part_file):
+        ''' Load partition data from a yaml specification '''
+
+        try:
+            self.status(msg='Reading partition specification: %s' % part_file)
+            with open(part_file, 'r') as f:
+                return yaml.safe_load(f)
+        except BaseException:
+            self.status(msg='Unable to load partition specification')
+            raise
+
+    def process_partition_data(self, partition_data, sector_size):
+        ''' Calculate offsets, sizes, and numbering for each partition '''
+
+        partitions = partition_data['partitions']
+        requested_numbers = set(partition['number']
+                            for partition in partitions
+                            if 'number' in partition)
+
+        total_size = 0
+        used_numbers = set()
+        offset = partition_data['start_offset'] * (512 / sector_size)
+        for partition in partitions:
+            # Find the next unused partition number
+            for n in xrange(1,5):
+                if n not in used_numbers and n not in requested_numbers:
+                    part_num = n
+                    break
+                elif n == 4:
+                    raise cliapp.AppException('A maximum of four'
+                                              ' partitions is supported.')
+
+            if 'number' in partition:
+                part_num_req = partition['number']
+                if 1 <= part_num_req <= 4:
+                    if part_num_req not in used_numbers:
+                        part_num = part_num_req
+                    else:
+                        raise cliapp.AppException('Repeated partition number')
+                else:
+                    raise cliapp.AppException('Requested partition number %s.'
+                                              ' A maximum of four partitions'
+                                              ' is supported.' % part_num_req)
+
+            partition['number'] = part_num
+            used_numbers.add(part_num)
+
+            size_bytes = self._parse_size(str(partition['size']))
+            partition['size'] = size_bytes
+            total_size += size_bytes
+
+            size_sectors = (size_bytes / sector_size +
+                           ((size_bytes % sector_size) != 0) * 1)
+            partition['size_sectors'] = size_sectors
+            partition['start'] = offset
+            partition['end'] = offset + size_sectors
+            offset += size_sectors + 1
+
+            if 'boot' in partition:
+                partition['boot'] = self.get_boolean(partition['boot'])
+            else:
+                partition['boot'] = False
+
+            self.status(msg='Number:   %s' % str(partition['number']))
+            self.status(msg='  Start:  %s sectors' % str(partition['start']))
+            self.status(msg='  End:    %s sectors' % str(partition['end']))
+            self.status(msg='  Ftype:  %s' % str(partition['fdisk_type']))
+            self.status(msg='  Format: %s' % str(partition['format']))
+            self.status(msg='  Size:   %s bytes' % str(partition['size']))
+
+        self.status(msg='Requested image size: %s bytes' % total_size)
+
+        size = self.get_disk_size()
+        if not size:
+            raise cliapp.AppException('DISK_SIZE is not defined')
+        if total_size > size:
+            raise cliapp.AppException('Requested total size'
+                                      ' exceeds disk image size')
+
+        # Sort the partitions by partition number
+        new_partitions = sorted(partitions, key=lambda partition:
+                                partition['number'])
+
+        new_partition_data = partition_data
+        new_partition_data['partitions'] = new_partitions
+        return new_partition_data
