@@ -634,3 +634,16 @@ class WriteExtension(cliapp.Application):
             if e.errno == errno.ENOENT:
                 return False
             raise
+
+    @staticmethod
+    def get_sector_size(location):
+        ''' Get the underlying physical sector size of a device or image '''
+
+        fdisk_output = cliapp.runcmd(['fdisk', '-l', location])
+        r = re.compile('.*Sector size.*?(\d+) bytes', re.DOTALL)
+        m = re.match(r, fdisk_output)
+        if m:
+            return int(m.group(1))
+        else:
+            raise cliapp.AppException('Can\'t get physical sector '
+                                      'size for %s' % location)
