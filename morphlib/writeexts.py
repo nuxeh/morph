@@ -398,7 +398,7 @@ class WriteExtension(cliapp.Application):
             filepath = os.path.join(existing_state_dir, filename)
             cliapp.runcmd(['mv', filepath, subvolume])
 
-    def complete_fstab_for_btrfs_layout(self, system_dir, rootfs_uuid=None):
+    def complete_fstab_for_btrfs_layout(self, system_dir, rootfs_uuid=None, part_info=None):
         '''Fill in /etc/fstab entries for the default Btrfs disk layout.
 
         In the future we should move this code out of the write extension and
@@ -434,6 +434,10 @@ class WriteExtension(cliapp.Application):
                 fstab.add_line(
                         '%s  /%s  btrfs subvol=%s,defaults,rw,noatime 0 2' %
                         (root_device, state_dir, state_subvol))
+
+        for partition in part_info:
+            # Check for existing fstab entry
+            # not /
 
         fstab.write()
         return state_dirs_to_create
