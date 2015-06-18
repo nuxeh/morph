@@ -24,6 +24,7 @@ import tempfile
 import errno
 import stat
 import contextlib
+from contexter import ExitStack
 import yaml
 
 import morphlib
@@ -317,7 +318,7 @@ class WriteExtension(cliapp.Application):
             cliapp.runcmd(['losetup', '-d', device])
 
     def create_btrfs_system_layout(self, temp_root, mountpoint, version_label,
-                                   disk_uuid):
+                                   disk_uuid, part_info=None):
         '''Separate base OS versions from state using subvolumes.
 
         '''
@@ -354,7 +355,7 @@ class WriteExtension(cliapp.Application):
                 self.generate_bootloader_config(mountpoint)
             self.install_bootloader(mountpoint)
 
-    def create_orig(self, version_root, temp_root):
+    def create_orig(self, version_root, temp_root, excludes=None):
         '''Create the default "factory" system.'''
 
         orig = os.path.join(version_root, 'orig')
@@ -958,14 +959,33 @@ class WriteExtension(cliapp.Application):
             first partition encountered, even if multiple partitions are
             flagged '''
 
-        for partition in partitions:
-            if 'type' in partition:
-                if partition['type'] == 'rootfs':
-                    self.status(msg='Creating rootfs on partition %d'
-                                     % partition['number'])
-                    with self.create_loopback(location,
-                                              partition['start'] *
-                                              sector_size,
-                                              partition['size']) as loopdev:
-                        self.create_system(temp_root, loopdev)
-                    break
+        ''' The use of contexter.py here to provide ExitStack(). This dependency
+            could be removed by using contextlib provided with Python 3 '''
+
+        with ExitStack() as stack:
+            mountpoints = {partition['mountpoint']:
+                                 {'format': partition['format'],
+                                  'uuid':   self.get_uuid(location,
+                                                          partition['start'] *
+                                                          sector_size),
+               'mount_dir': stack.enter_context(self.mount(
+                            stack.enter_context(
+                                   self.create_loopback(location,
+                                                        partition['start'] *
+                                                        sector_size,
+                                                        partition['size']))))}
+                                                for partition in partitions
+                                                if 'mountpoint' in partition}
+
+            if '/' in mountpoints:
+                root_mount = mountpoints['/']
+                self.create_btrfs_system_layout(temp_root,
+                                                root_mount['mount_dir'],
+                                                'factory', root_mount['uuid'],
+                                                mountpoints)
+            else:
+                raise Exception('No root partition specified, '
+                                              'please add a partition with '
+                                              'mountpoint \'/\'')
+
+                # TODO exception handling
