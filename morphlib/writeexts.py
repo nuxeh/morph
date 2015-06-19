@@ -302,12 +302,13 @@ class WriteExtension(cliapp.Application):
         self.status(msg='Creating loopback')
         try:
             if size and offset:
-                cmd = ['losetup', '--show', '-f', '-o', str(offset),
+                cmd = ['losetup', '--show', '-f', '-P', '-o', str(offset),
                        '--sizelimit', str(size), location]
             else:
-                cmd = ['losetup', '--show', '-f', '-o', str(offset),
+                cmd = ['losetup', '--show', '-f', '-P', '-o', str(offset),
                         location]
             device = cliapp.runcmd(cmd).rstrip()
+            time.sleep(1)
         except cliapp.AppException:
             sys.stderr.write('Error creating loopback')
             raise
@@ -333,10 +334,16 @@ class WriteExtension(cliapp.Application):
         system_dir = os.path.join(version_root, 'orig')
 
         state_dirs = self.complete_fstab_for_btrfs_layout(system_dir,
-                                                          disk_uuid)
+                                                        disk_uuid, part_info)
 
         for state_dir in state_dirs:
             self.create_state_subvolume(system_dir, mountpoint, state_dir)
+
+        if part_info is not None:
+            for partition in part_info:
+                if partition != '/':
+                    partition_info = part_info[partition]
+                    self.move_partition_files(system_dir, partition, partition_info['mount_dir'])
 
         self.create_run(version_root)
 
@@ -398,6 +405,20 @@ class WriteExtension(cliapp.Application):
             filepath = os.path.join(existing_state_dir, filename)
             cliapp.runcmd(['mv', filepath, subvolume])
 
+    def move_partition_files(self, system_dir, partition, partition_mount):
+        existing_part_dir = os.path.join(system_dir, partition)
+        files = []
+        if os.path.exists(existing_part_dir):
+            files = os.listdir(existing_part_dir)
+        if len(files) > 0:
+            self.status(msg='Moving existing data to %s partition' % partition)
+        for filename in files:
+            filepath = os.path.join(existing_part_dir, filename)
+            print filepath
+            print partition_mount
+            cliapp.runcmd(['mv', filepath, partition_mount])
+            # TODO test breaking this
+
     def complete_fstab_for_btrfs_layout(self, system_dir, rootfs_uuid=None, part_info=None):
         '''Fill in /etc/fstab entries for the default Btrfs disk layout.
 
@@ -435,9 +456,22 @@ class WriteExtension(cliapp.Application):
                         '%s  /%s  btrfs subvol=%s,defaults,rw,noatime 0 2' %
                         (root_device, state_dir, state_subvol))
 
-        for partition in part_info:
-            # Check for existing fstab entry
-            # not /
+        if part_info is not None:
+            for partition in part_info:
+                if partition != '/':
+                    partition_info = part_info[partition]
+                    if partition not in existing_mounts:
+                        f_uuid = (partition_info['uuid'],
+                                  partition, partition_info['format'])
+                        self.status(msg='Adding fstab entry for partition %s,'
+                                        ' UUID: %s, format: %s' %
+                                        (f_uuid[1], f_uuid[0], f_uuid[2]))
+                        fstab.add_line('UUID=%s  %s %s defaults,rw,noatime '
+                                       '0 2' % f_uuid)
+                    else:
+                        self.status(msg='Warning: an entry already exists in '
+                                        'fstab for partition %s, skipping'
+                                        % partition)
 
         fstab.write()
         return state_dirs_to_create
@@ -966,30 +1000,43 @@ class WriteExtension(cliapp.Application):
         ''' The use of contexter.py here to provide ExitStack(). This dependency
             could be removed by using contextlib provided with Python 3 '''
 
-        with ExitStack() as stack:
-            mountpoints = {partition['mountpoint']:
-                                 {'format': partition['format'],
-                                  'uuid':   self.get_uuid(location,
-                                                          partition['start'] *
-                                                          sector_size),
-               'mount_dir': stack.enter_context(self.mount(
-                            stack.enter_context(
-                                   self.create_loopback(location,
-                                                        partition['start'] *
-                                                        sector_size,
-                                                        partition['size']))))}
-                                                for partition in partitions
-                                                if 'mountpoint' in partition}
+        try:
+            with ExitStack() as stack:
+                mountpoints = {partition['mountpoint']:
+                                     {'format': partition['format'],
+                                      'uuid':   self.get_uuid(location,
+                                                              partition['start'] *
+                                                              sector_size),
+                   'mount_dir': stack.enter_context(self.mount(
+                                stack.enter_context(
+                                       self.create_loopback(location,
+                                                            partition['start'] *
+                                                            sector_size,
+                                                            partition['size']))))}
+                                                    for partition in partitions
+                                                    if 'mountpoint' in partition}
 
-            if '/' in mountpoints:
-                root_mount = mountpoints['/']
-                self.create_btrfs_system_layout(temp_root,
-                                                root_mount['mount_dir'],
-                                                'factory', root_mount['uuid'],
-                                                mountpoints)
-            else:
-                raise Exception('No root partition specified, '
-                                              'please add a partition with '
-                                              'mountpoint \'/\'')
 
+                try:
+                    if '/' in mountpoints:
+                        self.status(msg='Creating system')
+                        root_mount = mountpoints['/']
+                        self.create_btrfs_system_layout(temp_root,
+                                                        root_mount['mount_dir'],
+                                                        'factory', root_mount['uuid'],
+                                                        mountpoints)
+                    else:
+                        raise Exception('No root partition specified, '
+                                        'please add a partition with '
+                                        'mountpoint \'/\'')
+
+
+                except BaseException as e:
+                    print 'caught exception: %s' % e
+
+
+                
+        except BaseException as e:
+            print 'caught exception: %s' % e
+            raise
                 # TODO exception handling
