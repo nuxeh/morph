@@ -835,7 +835,7 @@ class WriteExtension(cliapp.Application):
         self.status(msg="Creating partition table on %s" % location)
 
         # Create a new partition table
-        cmd = "o\n"
+        cmd = "o\n" # TODO: Allow GPT partition table
         for partition in partition_data['partitions']:
             part_num = partition['number']
             # Create partitions
