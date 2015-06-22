@@ -294,8 +294,9 @@ class WriteExtension(cliapp.Application):
 
     @contextlib.contextmanager
     def create_loopback(self, location, offset=0, size=0):
-        ''' Create a loopback device for an image, or a partition in
-            an image
+        ''' Create a loopback device for accessing an image, a block device, or a partition in
+            either of these as a block device.
+
               * offset - offset of the start of a partition in bytes
               * size - limits the size of the partition, in bytes '''
 
@@ -308,6 +309,11 @@ class WriteExtension(cliapp.Application):
                 cmd = ['losetup', '--show', '-f', '-P', '-o', str(offset),
                         location]
             device = cliapp.runcmd(cmd).rstrip()
+            # Allow the system time to see the new device
+            # Without this, mounts created on the created
+            # too soon after creating the loopback devce
+            # loopback device are unreliable, even though
+            # the -P (--partscan) option is passed to losetup
             time.sleep(1)
         except cliapp.AppException:
             sys.stderr.write('Error creating loopback')
@@ -999,6 +1005,8 @@ class WriteExtension(cliapp.Application):
 
         ''' The use of contexter.py here to provide ExitStack(). This dependency
             could be removed by using contextlib provided with Python 3 '''
+
+# TODO: Test with python 3, split files - contexter.py in *morph*
 
         try:
             with ExitStack() as stack:
