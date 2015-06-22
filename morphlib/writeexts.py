@@ -350,9 +350,9 @@ class WriteExtension(cliapp.Application):
 
         if part_info is not None:
             for partition in part_info:
-                if partition != '/':
-                    partition_info = part_info[partition]
-                    self.move_partition_files(system_dir, partition, partition_info['mount_dir'])
+#                if partition != '/':
+                partition_info = part_info[partition]
+                self.move_partition_files(system_dir, partition, partition_info['mount_dir'])
 
         self.create_run(version_root)
 
@@ -423,8 +423,6 @@ class WriteExtension(cliapp.Application):
             self.status(msg='Moving existing data to %s partition' % partition)
         for filename in files:
             filepath = os.path.join(existing_part_dir, filename)
-            print filepath
-            print partition_mount
             print 'mv %s %s' % (filepath, partition_mount)
             #cliapp.runcmd(['mv', filepath, partition_mount])
             # TODO test breaking this
