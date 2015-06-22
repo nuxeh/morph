@@ -425,7 +425,8 @@ class WriteExtension(cliapp.Application):
             filepath = os.path.join(existing_part_dir, filename)
             print filepath
             print partition_mount
-            cliapp.runcmd(['mv', filepath, partition_mount])
+            print 'mv %s %s' % (filepath, partition_mount)
+            #cliapp.runcmd(['mv', filepath, partition_mount])
             # TODO test breaking this
 
     def complete_fstab_for_btrfs_layout(self, system_dir, rootfs_uuid=None, part_info=None):
