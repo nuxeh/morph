@@ -24,7 +24,10 @@ import tempfile
 import errno
 import stat
 import contextlib
-from contexter import ExitStack
+try:
+    from contexter import ExitStack
+except ImportError:
+    pass
 import yaml
 
 import morphlib
