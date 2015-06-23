@@ -25,6 +25,7 @@ import errno
 import stat
 import contextlib
 try:
+    # TODO: try importing from contextlib first
     from contexter import ExitStack
 except ImportError:
     pass
@@ -788,8 +789,16 @@ class WriteExtension(cliapp.Application):
 
         total_size = 0
         used_numbers = set()
-        offset = partition_data['start_offset'] * (512 / sector_size)
+        offset = (partition_data['start_offset'] * 512) / sector_size
+        if (offset * sector_size) < 1048576): 
+            raise cliapp.AppException('Start offset should be greater than '
+                                      '2048 sectors (or equivalent) '
+                                      'where block size is 512 bytes'
+        if (offset % 8) != 0 and sector_size == 512:
+            self.status(msg='Warning: Start sector is not aligned to '
+                            '4096 byte sector boundaries')
         for partition in partitions:
+            # TODO: Correct handling of partition numbers for GPT partition tables
             # Find the next unused partition number
             for n in xrange(1,5):
                 if n not in used_numbers and n not in requested_numbers:
@@ -814,6 +823,7 @@ class WriteExtension(cliapp.Application):
             partition['number'] = part_num
             used_numbers.add(part_num)
 
+            # Process partition sizes
             size_bytes = self._parse_size(str(partition['size']))
             partition['size'] = size_bytes
             total_size += size_bytes
@@ -822,8 +832,8 @@ class WriteExtension(cliapp.Application):
                            ((size_bytes % sector_size) != 0) * 1)
             partition['size_sectors'] = size_sectors
             partition['start'] = offset
-            partition['end'] = offset + size_sectors
-            offset += size_sectors + 1
+            partition['end'] = offset + (size_sectors - 1)
+            offset += size_sectors
 
             if 'boot' in partition:
                 partition['boot'] = self.get_boolean(partition['boot'])
@@ -837,7 +847,13 @@ class WriteExtension(cliapp.Application):
             self.status(msg='  Format: %s' % str(partition['format']))
             self.status(msg='  Size:   %s bytes' % str(partition['size']))
 
-        self.status(msg='Requested image size: %s bytes' % total_size)
+        discsize_sectors = self.get_disk_size() / sector_size
+        total_sectors = total_size / sector_size
+        self.status(msg='Requested image size: %s bytes '
+                        '(%d sectors of %d bytes)' %
+                         (total_size, total_sectors, sector_size))
+        unused_space = (self.get_disk_size() / sector_size) - total_sectors
+
 
         size = self.get_disk_size()
         if not size:
@@ -860,14 +876,20 @@ class WriteExtension(cliapp.Application):
         self.status(msg="Creating partition table on %s" % location)
 
         # Create a new partition table
-        cmd = "o\n" # TODO: Allow GPT partition table
+        part_table_format = partition_data['partition_table_format'].lower()
+        if part_table_format in ('mbr', 'dos'):
+            cmd = "o\n"
+        elif part_table_format == 'gpt':
+            cmd = "g\n"
+
         for partition in partition_data['partitions']:
             part_num = partition['number']
             # Create partitions
             if partition['fdisk_type'] != 'none':
-                cmd += ("n\n"
-                        "p\n"
-                        "" + str(part_num) + "\n"
+                cmd += "n\n"
+                if part_table_format in ('mbr', 'dos'):
+                    cmd += "p\n"
+                cmd += (str(part_num) + "\n"
                         "" + str(partition['start']) + "\n"
                         "" + str(partition['end']) + "\n")
 
@@ -888,7 +910,7 @@ class WriteExtension(cliapp.Application):
 
         # Write changes
         cmd += ("w\n"
-               "q\n")
+                "q\n")
         cliapp.runcmd(['fdisk', location], feed_stdin=cmd)
 
     def create_partition_filesystems(self, location, partitions, sector_size):
