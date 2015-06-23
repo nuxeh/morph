@@ -297,8 +297,11 @@ class WriteExtension(cliapp.Application):
 
     @contextlib.contextmanager
     def create_loopback(self, location, offset=0, size=0):
-        ''' Create a loopback device for accessing an image, a block device, or a partition in
-            either of these as a block device.
+        ''' Create a loopback device for accessing block devices
+
+            This may be an image, or a real block device, or a partition in
+            either of these, for access as a raw device without filesystem,
+            or for subsequent mounting.
 
               * offset - offset of the start of a partition in bytes
               * size - limits the size of the partition, in bytes '''
@@ -313,9 +316,9 @@ class WriteExtension(cliapp.Application):
                         location]
             device = cliapp.runcmd(cmd).rstrip()
             # Allow the system time to see the new device
-            # Without this, mounts created on the created
-            # too soon after creating the loopback devce
-            # loopback device are unreliable, even though
+            # Without this, mounts created on the loopdev
+            # too soon after creating the loopback device
+            # are unreliable, even though
             # the -P (--partscan) option is passed to losetup
             time.sleep(1)
         except cliapp.AppException:
@@ -416,20 +419,29 @@ class WriteExtension(cliapp.Application):
             cliapp.runcmd(['mv', filepath, subvolume])
 
     def move_partition_files(self, system_dir, partition, partition_mount):
-        print 'system dir: %s' % system_dir
-        existing_part_dir = os.path.join(system_dir, partition)
-        print ': sting_part_dirs' % existing_part_dir
+        ''' Move files from the unpacked rootfs to partitions
+
+            Move files from the mount dir for a given partition in the
+            unpacked rootfs to the actual mounted partition, leaving an empty
+            mountpoint in the rootfs. If no existing directory is present in
+            the rootfs, create an empty directory in the rootfs to be used as
+            the partition's mount point '''
+
+        existing_part_dir = os.path.join(system_dir,
+                                         re.sub('^/', '', partition))
         files = []
-        # TODO: Make sure mount point exists
         if os.path.exists(existing_part_dir):
             files = os.listdir(existing_part_dir)
+        else:
+            self.status(msg='Creating empty mountpoint for %s partition' %
+                             partition)
+            os.mkdir(existing_part_dir)
         if len(files) > 0:
-            self.status(msg='Moving existing data to %s partition' % partition)
+            self.status(msg='Moving existing data to %s partition' %
+                             partition)
         for filename in files:
             filepath = os.path.join(existing_part_dir, filename)
-            print 'mv %s %s' % (filepath, partition_mount)
-            #cliapp.runcmd(['mv', filepath, partition_mount])
-            # TODO test breaking this
+            cliapp.runcmd(['mv', filepath, partition_mount])
 
     def complete_fstab_for_btrfs_layout(self, system_dir, rootfs_uuid=None, part_info=None):
         '''Fill in /etc/fstab entries for the default Btrfs disk layout.
@@ -468,6 +480,7 @@ class WriteExtension(cliapp.Application):
                         '%s  /%s  btrfs subvol=%s,defaults,rw,noatime 0 2' %
                         (root_device, state_dir, state_subvol))
 
+        # Add entries for partitions
         if part_info is not None:
             for partition in part_info:
                 if partition != '/':
@@ -984,7 +997,8 @@ class WriteExtension(cliapp.Application):
                 file_offset = raw_file['offset'] * sector_size
             if 'offset_bytes' in raw_file:
                 file_offset = raw_file['offset_bytes']
-            source = os.path.join(temp_root, raw_file['file'])
+            source = os.path.join(temp_root,
+                                  re.sub('^/', '', raw_file['file']))
             if os.path.exists(source):
                 if not os.path.isdir(source):
                     self.status(msg='Writing %s, at offset %d bytes' %
@@ -1012,6 +1026,8 @@ class WriteExtension(cliapp.Application):
         ''' The use of contexter.py here to provide ExitStack(). This dependency
             could be removed by using contextlib provided with Python 3 '''
 
+        self.status(msg='Creating system')
+
 # TODO: Test with python 3, split files - contexter.py in *morph*
 
         try:
@@ -1033,7 +1049,6 @@ class WriteExtension(cliapp.Application):
 
                 try:
                     if '/' in mountpoints:
-                        self.status(msg='Creating system')
                         root_mount = mountpoints['/']
                         self.create_btrfs_system_layout(temp_root,
                                                         root_mount['mount_dir'],
@@ -1049,7 +1064,7 @@ class WriteExtension(cliapp.Application):
                     print 'caught exception: %s' % e
 
 
-                
+
         except BaseException as e:
             print 'caught exception: %s' % e
             raise
