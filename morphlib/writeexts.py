@@ -350,9 +350,10 @@ class WriteExtension(cliapp.Application):
 
         if part_info is not None:
             for partition in part_info:
-#                if partition != '/':
-                partition_info = part_info[partition]
-                self.move_partition_files(system_dir, partition, partition_info['mount_dir'])
+                if partition != '/':
+                    partition_info = part_info[partition]
+                    self.move_partition_files(system_dir, partition,
+                                              partition_info['mount_dir'])
 
         self.create_run(version_root)
 
@@ -415,6 +416,7 @@ class WriteExtension(cliapp.Application):
             cliapp.runcmd(['mv', filepath, subvolume])
 
     def move_partition_files(self, system_dir, partition, partition_mount):
+        print 'system dir: %s' % system_dir
         existing_part_dir = os.path.join(system_dir, partition)
         files = []
         if os.path.exists(existing_part_dir):
