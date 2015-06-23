@@ -418,7 +418,9 @@ class WriteExtension(cliapp.Application):
     def move_partition_files(self, system_dir, partition, partition_mount):
         print 'system dir: %s' % system_dir
         existing_part_dir = os.path.join(system_dir, partition)
+        print ': sting_part_dirs' % existing_part_dir
         files = []
+        # TODO: Make sure mount point exists
         if os.path.exists(existing_part_dir):
             files = os.listdir(existing_part_dir)
         if len(files) > 0:
