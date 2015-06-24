@@ -946,44 +946,6 @@ class WriteExtension(cliapp.Application):
             raise cliapp.AppException('Unrecognised filesystem'
                                       ' format: %s' % fstype)
 
-    def copy_partition_files(self, location, temp_root,
-                             partitions, sector_size):
-        ''' Copy files specified in the partition specification
-            from the unpacked rootfs to partitions '''
-
-        for partition in partitions:
-            if 'files' in partition:
-                if partition['format'] not in ['none', 'None', None]:
-                    self.status(msg='Copying files to partition %s'
-                                     % partition['number'])
-                    with self.create_loopback(location,
-                                              partition['start'] *
-                                              sector_size,
-                                              partition['size']) as loopdev:
-                        with self.mount(loopdev) as mp:
-                            for file in partition['files']:
-                                source = os.path.join(temp_root, file['file'])
-                                if os.path.exists(source):
-                                    self.status(msg='Copying: %s' % source)
-                                    dest_dir = ''
-                                    if 'dest_dir' in file:
-                                        dest_dir = file['dest_dir']
-                                    target = os.path.join(mp, dest_dir)
-                                    try:
-                                        if not os.path.exists(target):
-                                            os.makedirs(target)
-                                        shutil.copy(source, target)
-                                    except BaseException:
-                                        raise cliapp.AppException(
-                                                        'Error copying files')
-                                else:
-                                    raise cliapp.AppException('File not found: %s'
-                                                              % source)
-                        cliapp.runcmd('sync')
-                else:
-                    raise cliapp.AppException('Cannot copy files to'
-                                              ' an unformatted partition')
-
     def partition_direct_copy(self, location, temp_root,
                               partition_data, sector_size):
         ''' Copy files directly to a partition using `dd`
