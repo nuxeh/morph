@@ -423,7 +423,7 @@ class WriteExtension(cliapp.Application):
         ''' Move files from the unpacked rootfs to partitions
 
             Move files from the mount dir for a given partition in the
-            unpacked rootfs to the actual mounted partition, leaving an empty
+            unpacked rootfs, to the actual mounted partition, leaving an empty
             mountpoint in the rootfs. If no existing directory is present in
             the rootfs, create an empty directory in the rootfs to be used as
             the partition's mount point '''
@@ -495,7 +495,7 @@ class WriteExtension(cliapp.Application):
                         fstab.add_line('UUID=%s  %s %s defaults,rw,noatime '
                                        '0 2' % f_uuid)
                     else:
-                        self.status(msg='Warning: an entry already exists in '
+                        self.status(msg='WARNING: an entry already exists in '
                                         'fstab for partition %s, skipping'
                                         % partition)
 
@@ -763,10 +763,10 @@ class WriteExtension(cliapp.Application):
         self.create_partition_table(location, partition_data)
         partitions = partition_data['partitions']
         self.create_partition_filesystems(location, partitions, sector_size)
-        self.partition_direct_copy(location, temp_root,
-                                   partition_data, sector_size)
-        self.create_partition_rootfs(temp_root, location,
-                                     partitions, sector_size)
+        #self.partition_direct_copy(location, temp_root,
+        #                           partition_data, sector_size)
+        #self.create_partition_rootfs(temp_root, location,
+        #                             partitions, sector_size)
 
     def load_partition_data(self, part_file):
         ''' Load partition data from a yaml specification '''
@@ -787,80 +787,149 @@ class WriteExtension(cliapp.Application):
                             for partition in partitions
                             if 'number' in partition)
 
-        total_size = 0
+        if partition_data['partition_table_format'] == 'gpt':
+            allowed_partitions = 128
+        else:
+            allowed_partitions = 4
+
+        if partition_data['partition_table_format'] not in ('dos',
+                                                            'mbr',
+                                                            'gpt'):
+            raise cliapp.AppException(msg='Unrecognised partition table type')
+
+        # Process partition numbering and boot flag
         used_numbers = set()
-        offset = (partition_data['start_offset'] * 512) / sector_size
-        if (offset * sector_size) < 1048576): 
-            raise cliapp.AppException('Start offset should be greater than '
-                                      '2048 sectors (or equivalent) '
-                                      'where block size is 512 bytes'
-        if (offset % 8) != 0 and sector_size == 512:
-            self.status(msg='Warning: Start sector is not aligned to '
-                            '4096 byte sector boundaries')
         for partition in partitions:
-            # TODO: Correct handling of partition numbers for GPT partition tables
             # Find the next unused partition number
-            for n in xrange(1,5):
+            for n in xrange(1, allowed_partitions + 1):
                 if n not in used_numbers and n not in requested_numbers:
                     part_num = n
                     break
-                elif n == 4:
-                    raise cliapp.AppException('A maximum of four'
-                                              ' partitions is supported.')
+                elif n == allowed_partitions:
+                    raise cliapp.AppException('A maximum of %d partitions is '
+                                              'supported for %s partition '
+                                              'tables' % (allowed_partitions,
+                                    partition_data['partition_table_format']))
 
             if 'number' in partition:
+                if partition_data['partition_table_format'] == 'gpt':
+                    raise cliapp.AppException('Partition numbering can\'t be '
+                                              'overridden when using a GPT')
                 part_num_req = partition['number']
-                if 1 <= part_num_req <= 4:
+                if 1 <= part_num_req <= allowed_partitions:
                     if part_num_req not in used_numbers:
                         part_num = part_num_req
                     else:
                         raise cliapp.AppException('Repeated partition number')
                 else:
                     raise cliapp.AppException('Requested partition number %s.'
-                                              ' A maximum of four partitions'
-                                              ' is supported.' % part_num_req)
+                                              ' A maximum of %d partitions is'
+                                              ' supported for %s partition'
+                                              ' tables' % (part_num_req,
+                                              allowed_partitions,
+                                    partition_data['partition_table_format']))
 
             partition['number'] = part_num
             used_numbers.add(part_num)
-
-            # Process partition sizes
-            size_bytes = self._parse_size(str(partition['size']))
-            partition['size'] = size_bytes
-            total_size += size_bytes
-
-            size_sectors = (size_bytes / sector_size +
-                           ((size_bytes % sector_size) != 0) * 1)
-            partition['size_sectors'] = size_sectors
-            partition['start'] = offset
-            partition['end'] = offset + (size_sectors - 1)
-            offset += size_sectors
 
             if 'boot' in partition:
                 partition['boot'] = self.get_boolean(partition['boot'])
             else:
                 partition['boot'] = False
 
+        # Process partition sizes
+        start = (partition_data['start_offset'] * 512) / sector_size
+        # Sector quantities in the specification are assumed to be 512 bytes
+        # This converts to the real sector size
+        min_start_bytes = 1024**2
+        if (start * sector_size) < min_start_bytes:
+            raise cliapp.AppException('Start offset should be greater than '
+                                      '%d, for %d byte sectors' %
+                                      (min_start_bytes / sector_size,
+                                       sector_size))
+        # Check the disk's first partition starts on a 4096 byte boundary
+        # this ensures alignment, and avoiding a reduction in performance
+        # on disks which use a 4096 byte physical sector size
+        if (start * sector_size) % 4096 != 0:
+            self.status(msg='WARNING: Start sector is not aligned to '
+                            '4096 byte sector boundaries')
+
+        disk_size = self.get_disk_size()
+        if not disk_size:
+            raise cliapp.AppException('DISK_SIZE is not defined')
+
+        disk_size_sectors = disk_size / sector_size
+        if partition_data['partition_table_format'] == 'gpt':
+            # GPT partition table is duplicated at the end of the device.
+            # GPT header takes one sector, whatever the sector size,
+            # with a 16384 byte 'minimum' area for partition entries,
+            # supporting up to 128 partitions (128 bytes per entry).
+            # The duplicate GPT does not include the protective MBR
+            gpt_size_sectors = (sector_size + (16 * 1024)) / sector_size
+            total_usable_sectors = (disk_size_sectors -
+                                   (start + gpt_size_sectors))
+        else:
+            total_usable_sectors = disk_size_sectors - start
+
+        offset = start
+        for partition in partitions:
+            if partition['size'] != 'fill':
+                size_bytes = self._parse_size(str(partition['size']))
+
+                size_sectors = (size_bytes / sector_size +
+                               ((size_bytes % 4096) != 0) *
+                               (4096 / sector_size))
+
+                offset += size_sectors
+                partition['size_sectors'] = size_sectors
+                partition['size'] = size_sectors * sector_size
+
+        if len(['' for partition in partitions
+                if partition['size'] == 'fill']) > 1:
+            raise cliapp.AppException('Only one partition can '
+                                      'have \'size: fill\'')
+
+        free_sectors = total_usable_sectors - offset
+
+        offset = start
+        total_size = 0
+        last_sector = 0
+        for partition in partitions:
+            # Process filled partition
+            if partition['size'] == 'fill':
+                if free_sectors < 1:
+                    raise cliapp.AppException(msg='Not enough space to create'
+                                                  'fill partition')
+                partition['size_sectors'] = free_sectors
+                partition['size'] = size_sectors * sector_size
+                self.status(msg='Filling partition %s to size: %d bytes' %
+                                 (partition['number'], partition['size']))
+            # Process partition start and end points
+            partition['start'] = offset
+            size_sectors = partition['size_sectors']
+            last_sector = offset + (size_sectors - 1)
+            partition['end'] = last_sector
+            offset += size_sectors
+
+        # Size checks
+        self.status(msg='Requested image size: %s bytes '
+                        '(%d sectors of %d bytes)' %
+                        (last_sector * sector_size, last_sector, sector_size))
+        unused_space = total_usable_sectors - last_sector
+        self.status(msg='Unused space: %d bytes (%d sectors)' %
+                         (unused_space * sector_size, unused_space))
+
+        if last_sector > total_usable_sectors:
+            raise cliapp.AppException('Requested total size exceeds '
+                                      'disk image size DISK_SIZE')
+
+        for partition in partitions:
             self.status(msg='Number:   %s' % str(partition['number']))
             self.status(msg='  Start:  %s sectors' % str(partition['start']))
             self.status(msg='  End:    %s sectors' % str(partition['end']))
             self.status(msg='  Ftype:  %s' % str(partition['fdisk_type']))
             self.status(msg='  Format: %s' % str(partition['format']))
             self.status(msg='  Size:   %s bytes' % str(partition['size']))
-
-        discsize_sectors = self.get_disk_size() / sector_size
-        total_sectors = total_size / sector_size
-        self.status(msg='Requested image size: %s bytes '
-                        '(%d sectors of %d bytes)' %
-                         (total_size, total_sectors, sector_size))
-        unused_space = (self.get_disk_size() / sector_size) - total_sectors
-
-
-        size = self.get_disk_size()
-        if not size:
-            raise cliapp.AppException('DISK_SIZE is not defined')
-        if total_size > size:
-            raise cliapp.AppException('Requested total size'
-                                      ' exceeds disk image size')
 
         # Sort the partitions by partition number
         new_partitions = sorted(partitions, key=lambda partition:
@@ -873,7 +942,9 @@ class WriteExtension(cliapp.Application):
     def create_partition_table(self, location, partition_data):
         ''' Use fdisk to create a partition table '''
 
-        self.status(msg="Creating partition table on %s" % location)
+        self.status(msg="Creating %s partition table on %s" %
+                        (partition_data['partition_table_format'].upper(),
+                         location))
 
         # Create a new partition table
         part_table_format = partition_data['partition_table_format'].lower()
@@ -978,9 +1049,11 @@ class WriteExtension(cliapp.Application):
         file_offset = start_offset
         for raw_file in raw_files_data:
             if 'offset' in raw_file:
-                file_offset = raw_file['offset'] * sector_size
+                # Sectors are assumed to be 512 bytes in the specification, so
+                # no adjustment is needed here since we write to a byte offset
+                file_offset = raw_file['offset'] * 512
             if 'offset_bytes' in raw_file:
-                file_offset = raw_file['offset_bytes']
+                file_offset = self._parse_size(str(raw_file['offset_bytes']))
             source = os.path.join(temp_root,
                                   re.sub('^/', '', raw_file['file']))
             if os.path.exists(source):
