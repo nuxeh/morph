@@ -352,6 +352,7 @@ class WriteExtension(cliapp.Application):
         for state_dir in state_dirs:
             self.create_state_subvolume(system_dir, mountpoint, state_dir)
 
+        print part_info
         if part_info is not None:
             for partition in part_info:
                 if partition != '/':
@@ -490,7 +491,7 @@ class WriteExtension(cliapp.Application):
                         f_uuid = (partition_info['uuid'],
                                   partition, partition_info['format'])
                         self.status(msg='Adding fstab entry for partition %s,'
-                                        ' UUID: %s, format: %s' %
+                                        ' UUID=%s, format=%s' %
                                         (f_uuid[1], f_uuid[0], f_uuid[2]))
                         fstab.add_line('UUID=%s  %s %s defaults,rw,noatime '
                                        '0 2' % f_uuid)
@@ -763,10 +764,10 @@ class WriteExtension(cliapp.Application):
         self.create_partition_table(location, partition_data)
         partitions = partition_data['partitions']
         self.create_partition_filesystems(location, partitions, sector_size)
-        #self.partition_direct_copy(location, temp_root,
-        #                           partition_data, sector_size)
-        #self.create_partition_rootfs(temp_root, location,
-        #                             partitions, sector_size)
+        self.create_partition_rootfs(temp_root, location,
+                                     partitions, sector_size)
+        self.partition_direct_copy(location, temp_root,
+                                   partition_data, sector_size)
 
     def load_partition_data(self, part_file):
         ''' Load partition data from a yaml specification '''
@@ -787,18 +788,18 @@ class WriteExtension(cliapp.Application):
                             for partition in partitions
                             if 'number' in partition)
 
-        if partition_data['partition_table_format'] == 'gpt':
+        pt_format = partition_data['partition_table_format']
+        if pt_format == 'gpt':
             allowed_partitions = 128
         else:
             allowed_partitions = 4
 
-        if partition_data['partition_table_format'] not in ('dos',
-                                                            'mbr',
-                                                            'gpt'):
+        if pt_format not in ('dos', 'mbr', 'gpt'):
             raise cliapp.AppException(msg='Unrecognised partition table type')
 
         # Process partition numbering and boot flag
         used_numbers = set()
+        seen_mountpoints = set()
         for partition in partitions:
             # Find the next unused partition number
             for n in xrange(1, allowed_partitions + 1):
@@ -808,11 +809,11 @@ class WriteExtension(cliapp.Application):
                 elif n == allowed_partitions:
                     raise cliapp.AppException('A maximum of %d partitions is '
                                               'supported for %s partition '
-                                              'tables' % (allowed_partitions,
-                                    partition_data['partition_table_format']))
+                                              'tables' % 
+                                              (allowed_partitions, pt_format))
 
             if 'number' in partition:
-                if partition_data['partition_table_format'] == 'gpt':
+                if pt_format == 'gpt':
                     raise cliapp.AppException('Partition numbering can\'t be '
                                               'overridden when using a GPT')
                 part_num_req = partition['number']
@@ -826,16 +827,30 @@ class WriteExtension(cliapp.Application):
                                               ' A maximum of %d partitions is'
                                               ' supported for %s partition'
                                               ' tables' % (part_num_req,
-                                              allowed_partitions,
-                                    partition_data['partition_table_format']))
+                                              allowed_partitions, pt_format))
 
             partition['number'] = part_num
             used_numbers.add(part_num)
 
+            # Boot flag
             if 'boot' in partition:
                 partition['boot'] = self.get_boolean(partition['boot'])
             else:
                 partition['boot'] = False
+
+            # Check for duplicated mountpoints
+            if 'mountpoint' in partition:
+                mountpoint = partition['mountpoint']
+                if mountpoint in seen_mountpoints:
+                    raise cliapp.AppException('Duplicated mountpoint: %s' %
+                                               mountpoint)
+                seen_mountpoints.add(mountpoint)
+
+        # Check for root mountpoint
+        if not '/' in seen_mountpoints:
+            raise cliapp.AppException('No root partition specified, '
+                                      'please add a partition with '
+                                      'mountpoint \'/\'')
 
         # Process partition sizes
         start = (partition_data['start_offset'] * 512) / sector_size
@@ -859,7 +874,7 @@ class WriteExtension(cliapp.Application):
             raise cliapp.AppException('DISK_SIZE is not defined')
 
         disk_size_sectors = disk_size / sector_size
-        if partition_data['partition_table_format'] == 'gpt':
+        if pt_format == 'gpt':
             # GPT partition table is duplicated at the end of the device.
             # GPT header takes one sector, whatever the sector size,
             # with a 16384 byte 'minimum' area for partition entries,
@@ -885,9 +900,9 @@ class WriteExtension(cliapp.Application):
                 partition['size'] = size_sectors * sector_size
 
         if len(['' for partition in partitions
-                if partition['size'] == 'fill']) > 1:
-            raise cliapp.AppException('Only one partition can '
-                                      'have \'size: fill\'')
+                   if partition['size'] == 'fill']) > 1:
+            raise cliapp.AppException('Only one partition can'
+                                      ' have \'size: fill\'')
 
         free_sectors = total_usable_sectors - offset
 
@@ -942,15 +957,14 @@ class WriteExtension(cliapp.Application):
     def create_partition_table(self, location, partition_data):
         ''' Use fdisk to create a partition table '''
 
+        pt_format = partition_data['partition_table_format'].lower()
         self.status(msg="Creating %s partition table on %s" %
-                        (partition_data['partition_table_format'].upper(),
-                         location))
+                        (pt_format.upper(), location))
 
         # Create a new partition table
-        part_table_format = partition_data['partition_table_format'].lower()
-        if part_table_format in ('mbr', 'dos'):
+        if pt_format in ('mbr', 'dos'):
             cmd = "o\n"
-        elif part_table_format == 'gpt':
+        elif pt_format == 'gpt':
             cmd = "g\n"
 
         for partition in partition_data['partitions']:
@@ -958,7 +972,7 @@ class WriteExtension(cliapp.Application):
             # Create partitions
             if partition['fdisk_type'] != 'none':
                 cmd += "n\n"
-                if part_table_format in ('mbr', 'dos'):
+                if pt_format in ('mbr', 'dos'):
                     cmd += "p\n"
                 cmd += (str(part_num) + "\n"
                         "" + str(partition['start']) + "\n"
@@ -987,7 +1001,7 @@ class WriteExtension(cliapp.Application):
     def create_partition_filesystems(self, location, partitions, sector_size):
         ''' Read partition data and create all required filesystems '''
 
-        self.status(msg="Creating filesystems")
+        self.status(msg="Creating filesystems...")
 
         for partition in partitions:
             filesystem = partition['format']
@@ -1026,7 +1040,7 @@ class WriteExtension(cliapp.Application):
             the top level of the configuration file, the offset is taken
             from the start of the disc '''
 
-        self.status(msg='Writing files directly to image')
+        self.status(msg='Writing files directly to image...')
 
         for partition in partition_data['partitions']:
             if 'raw_files' in partition:
@@ -1073,56 +1087,35 @@ class WriteExtension(cliapp.Application):
 
     def create_partition_rootfs(self, temp_root, location,
                                 partitions, sector_size):
-        ''' Create root filesystem for the partition flagged to be the rootfs
+        ''' Create the Baserock root filesystem, and set up partitions
 
-            This is a partition which contains a 'type: rootfs' element in
-            the partition specification. This will only be done once, for the
-            first partition encountered, even if multiple partitions are
-            flagged '''
+            Create a Baserock system on '/'. Additionally add entries for 
+            partitions to the system's /etc/fstab, copy files from the
+            mountpoint in the rootfs to the appropriate partition, or
+            create an empty mountpoint for it '''
 
-        ''' The use of contexter.py here to provide ExitStack(). This dependency
-            could be removed by using contextlib provided with Python 3 '''
+        self.status(msg='Creating system...')
 
-        self.status(msg='Creating system')
+        with ExitStack() as stack:
+            mountpoints = {partition['mountpoint']:
+                                {'format': partition['format'],
+                                 'uuid':   self.get_uuid(location,
+                                                         partition['start'] *
+                                                         sector_size),
+                'mount_dir': stack.enter_context(self.mount(
+                             stack.enter_context(
+                                   self.create_loopback(location,
+                                                        partition['start'] *
+                                                        sector_size,
+                                                        partition['size']))))}
+                                                for partition in partitions
+                                                if 'mountpoint' in partition}
+
+            root_mount = mountpoints['/']
+            self.create_btrfs_system_layout(temp_root,
+                                            root_mount['mount_dir'],
+                                            'factory', root_mount['uuid'],
+                                            mountpoints)
+
 
 # TODO: Test with python 3, split files - contexter.py in *morph*
-
-        try:
-            with ExitStack() as stack:
-                mountpoints = {partition['mountpoint']:
-                                     {'format': partition['format'],
-                                      'uuid':   self.get_uuid(location,
-                                                              partition['start'] *
-                                                              sector_size),
-                   'mount_dir': stack.enter_context(self.mount(
-                                stack.enter_context(
-                                       self.create_loopback(location,
-                                                            partition['start'] *
-                                                            sector_size,
-                                                            partition['size']))))}
-                                                    for partition in partitions
-                                                    if 'mountpoint' in partition}
-
-
-                try:
-                    if '/' in mountpoints:
-                        root_mount = mountpoints['/']
-                        self.create_btrfs_system_layout(temp_root,
-                                                        root_mount['mount_dir'],
-                                                        'factory', root_mount['uuid'],
-                                                        mountpoints)
-                    else:
-                        raise Exception('No root partition specified, '
-                                        'please add a partition with '
-                                        'mountpoint \'/\'')
-
-
-                except BaseException as e:
-                    print 'caught exception: %s' % e
-
-
-
-        except BaseException as e:
-            print 'caught exception: %s' % e
-            raise
-                # TODO exception handling
