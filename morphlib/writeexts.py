@@ -1099,17 +1099,17 @@ class WriteExtension(cliapp.Application):
         with ExitStack() as stack:
             mountpoints = {partition['mountpoint']:
                                 {'format': partition['format'],
-                                 'uuid':   self.get_uuid(location,
-                                                         partition['start'] *
-                                                         sector_size),
+                                 'uuid': self.get_uuid(location,
+                                                       partition['start'] *
+                                                       sector_size),
                 'mount_dir': stack.enter_context(self.mount(
                              stack.enter_context(
-                                   self.create_loopback(location,
-                                                        partition['start'] *
-                                                        sector_size,
-                                                        partition['size']))))}
-                                                for partition in partitions
-                                                if 'mountpoint' in partition}
+                                  self.create_loopback(location,
+                                                       partition['start'] *
+                                                       sector_size,
+                                                       partition['size']))))}
+                           for partition in partitions
+                           if 'mountpoint' in partition}
 
             root_mount = mountpoints['/']
             self.create_btrfs_system_layout(temp_root,
