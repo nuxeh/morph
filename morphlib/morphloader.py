@@ -585,10 +585,23 @@ class MorphologyLoader(object):
             cls._validate_products(morphology['name'],
                                    morphology['products'], errors)
 
+        for key in MorphologyDumper.keyorder:
+            if '-commands' in key and key in morphology:
+                cls._validate_commands(morphology['name'], key,
+                                       morphology[key], errors)
+
         if len(errors) == 1:
             raise errors[0]
         elif errors:
             raise MultipleValidationErrors(morphology['name'], errors)
+
+    @classmethod
+    def _validate_commands(cls, morphology_name, key, commands, errors):
+            for cmd_index, cmd in enumerate(commands):
+                if not isinstance(cmd, basestring):
+                    e = InvalidTypeError('%s[%d]' % (key, cmd_index),
+                                         str, type(cmd), morphology_name)
+                    errors.append(e)
 
     @classmethod
     def _validate_products(cls, morphology_name, products, errors):
