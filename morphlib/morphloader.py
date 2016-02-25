@@ -587,7 +587,7 @@ class MorphologyLoader(object):
 
         if 'configure-commands' in morphology:
             for cmd_index, cmd in morphology['configure-commands']:
-                if type(cmd) not str:
+                if not isinstance(cmd, str):
                     e = InvalidTypeError('configure-commands[%d]' % cmd_index,
                                           str, type(cmd), morphology['name'])
                     errors.append(e)
