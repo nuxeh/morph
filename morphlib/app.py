@@ -407,7 +407,13 @@ class Morph(cliapp.Application):
 
     def runcmd_unchecked(self, argv, *args, **kwargs):
         self._prepare_for_runcmd(argv, args, kwargs)
-        return cliapp.Application.runcmd_unchecked(self, argv, *args, **kwargs)
+	try:
+	    return cliapp.Application.runcmd_unchecked(self, argv, *args, **kwargs)
+        except (Exception, BaseException) as e:
+	    print "Caught!"
+	    print e
+	    print 'child_traceback'
+	    print e.child_traceback
 
     def parse_args(self, args, configs_only=False):
         return self.settings.parse_args(args,
