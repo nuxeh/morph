@@ -600,7 +600,7 @@ class MorphologyLoader(object):
             for cmd_index, cmd in enumerate(commands):
                 if not isinstance(cmd, basestring):
                     e = InvalidTypeError('%s[%d]' % (key, cmd_index),
-                                         str, type(cmd), morphology['name'])
+                                         str, type(cmd), morphology_name)
                     errors.append(e)
 
     @classmethod
