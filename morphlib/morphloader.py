@@ -586,10 +586,10 @@ class MorphologyLoader(object):
                                    morphology['products'], errors)
 
         if 'configure-commands' in morphology:
-            for cmd in morphology['configure-commands']:
-                print cmd
-                if cmd is None:
-                    e = InvalidFieldError('Empty command')
+            for cmd_index, cmd in morphology['configure-commands']:
+                if type(cmd) not str:
+                    e = InvalidTypeError('configure-commands[%d]' % cmd_index,
+                                          str, type(cmd), morphology['name'])
                     errors.append(e)
 
         if len(errors) == 1:
