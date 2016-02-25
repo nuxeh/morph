@@ -587,8 +587,8 @@ class MorphologyLoader(object):
 
         for key in MorphologyDumper.keyorder:
             if '-commands' in key:
-                _validate_commands(morphology['name'], key,
-                                   morphology[key], errors)
+                cls._validate_commands(morphology['name'], key,
+                                       morphology[key], errors)
 
         if len(errors) == 1:
             raise errors[0]
