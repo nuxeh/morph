@@ -585,11 +585,12 @@ class MorphologyLoader(object):
             cls._validate_products(morphology['name'],
                                    morphology['products'], errors)
 
-        for cmd in morphology['configure-commands']:
-            print cmd
-            if cmd is None:
-                e = InvalidFieldError('Empty command')
-                errors.append(e)
+        if 'configure-commands' in morphology:
+            for cmd in morphology['configure-commands']:
+                print cmd
+                if cmd is None:
+                    e = InvalidFieldError('Empty command')
+                    errors.append(e)
 
         if len(errors) == 1:
             raise errors[0]
