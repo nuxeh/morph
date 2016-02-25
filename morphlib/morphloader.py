@@ -585,7 +585,7 @@ class MorphologyLoader(object):
             cls._validate_products(morphology['name'],
                                    morphology['products'], errors)
 
-        for cmd in build_commands:
+        for cmd in morphology['configure-commands']:
             print cmd
             if cmd is None:
                 e = InvalidFieldError('Empty command')
