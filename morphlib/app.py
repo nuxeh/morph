@@ -406,7 +406,9 @@ class Morph(cliapp.Application):
         return cliapp.Application.runcmd(self, argv, *args, **kwargs)
 
     def runcmd_unchecked(self, argv, *args, **kwargs):
+        self.status(msg='prep run_unch')
         self._prepare_for_runcmd(argv, args, kwargs)
+        self.status(msg='run_unch')
         return cliapp.Application.runcmd_unchecked(self, argv, *args, **kwargs)
 
     def parse_args(self, args, configs_only=False):

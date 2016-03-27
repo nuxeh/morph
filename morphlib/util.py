@@ -639,9 +639,20 @@ def containerised_cmdline(args, cwd='.', root='/', binds=(),
     for src, dst in binds:
         # linux-user-chroot's mount target paths are relative to the chroot
         cmdargs.extend(('--mount-bind', src, os.path.relpath(dst, root)))
+    print writable_paths
+    import pdb; pdb.set_trace()
+    for f in os.walk(root):
+        print f
+    #for d in morphlib.fsutils.invert_paths(os.walk(root), writable_paths):
+    #    print d
     for d in morphlib.fsutils.invert_paths(os.walk(root), writable_paths):
+        print d
+        print root
+        print os.path.islink(d)
+        print os.path.relpath(d, root)
         if not os.path.islink(d):
             cmdargs.extend(('--mount-readonly', os.path.relpath(d, root)))
+            print cmdargs
     if mount_proc:
         proc_target = os.path.join(root, 'proc')
         if not os.path.exists(proc_target):

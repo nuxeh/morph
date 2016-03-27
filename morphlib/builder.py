@@ -344,7 +344,9 @@ class ChunkBuilder(BuilderBase):
 
                 with open(logfilepath, 'a') as log:
                     self.app.status(msg='Running %(key)s', key=key)
+                    self.app.status(msg='La La')
                     log.write('### %s ###\n' % key.upper())
+                    self.app.status(msg='La La 2')
 
                 for cmd in cmds:
                     if cmd is False: cmd = "false"
@@ -365,6 +367,9 @@ class ChunkBuilder(BuilderBase):
                         stdout.flush()
 
                     with open(os.devnull) as devnull:
+                        self.app.status(msg='CMD: %s' % cmd)
+                        exit_code = self.runcmd(['echo', 'hello!'])
+                        self.app.status(msg='exit code: %s' % exit_code)
                         exit_code = self.runcmd(['sh', '-x', '-c', cmd],
                                                 extra_env=extra_env,
                                                 cwd=relative_builddir,
@@ -374,6 +379,8 @@ class ChunkBuilder(BuilderBase):
                                                 stderr=subprocess.STDOUT,
                                                 logfile=logfilepath,
                                                 ccache_dir=ccache_dir)
+                    self.app.status(msg='CMD done')
+
 
                     if stdout:
                         stdout.flush()

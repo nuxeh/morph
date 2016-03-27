@@ -228,6 +228,8 @@ class StagingArea(object):
 
     def runcmd(self, argv, **kwargs):  # pragma: no cover
         '''Run a command in a chroot in the staging area.'''
+        self._app.status(msg='run_unch_stagingarea')
+        #import pdb; pdb.set_trace()
         assert 'env' not in kwargs
         kwargs['env'] = dict(self.env)
         if 'extra_env' in kwargs:
@@ -272,7 +274,9 @@ class StagingArea(object):
             writable_paths=do_not_mount_dirs)
 
         cmdline = morphlib.util.containerised_cmdline(
-            argv, **container_config)
+            argv, **container_config) ##//
+
+        self._app.status(msg='run_unch_stagingarea-2')
 
         if kwargs.get('logfile') != None:
             logfile = kwargs.pop('logfile')
