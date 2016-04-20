@@ -27,6 +27,6 @@ class ArtifactInspectionPlugin(cliapp.Plugin):
         pass
 
     def generate_manifest(self, args):
-        raise cliapp.AppException(
-            'This plugin has been moved to definitions, as:'
-            'scripts/system-manifest.py\nPlease run this script instead.')
+        raise cliapp.AppException('This plugin has been moved to '
+            'definitions.git, as: scripts/system-manifest.py\n'
+            'Please run that script directly instead.')
